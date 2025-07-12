@@ -527,7 +527,7 @@ GameInitBox::handle_player_click(unsigned int player_index, int cx, int cy) {
       return false;
     }
     if (cy >= 27 && cy < 69) {
-      unsigned int value = clamp(0, 68 - cy, 40);
+      unsigned int value = FREESERF_CLAMP(0, 68 - cy, 40);
       if (cx > 0 && cx < 6) {
         /* Supplies */
         player->set_supplies(value);

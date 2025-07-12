@@ -388,9 +388,9 @@ Player::change_knight_occupation(int index_, int adjust_max, int delta) {
   int min = knight_occupation[index_] & 0xf;
 
   if (adjust_max) {
-    max = clamp(min, max + delta, 4);
+    max = FREESERF_CLAMP(min, max + delta, 4);
   } else {
-    min = clamp(0, min + delta, max);
+    min = FREESERF_CLAMP(0, min + delta, max);
   }
 
   knight_occupation[index_] = (max << 4) | min;

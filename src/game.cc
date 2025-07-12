@@ -1180,7 +1180,7 @@ Game::get_leveling_height(MapPos pos) const {
   /* Calcualte height after leveling */
   int h_new_min = std::max((h_max > 4) ? (h_max - 4) : 1, 1);
   int h_new_max = h_min + 4;
-  int h_new = clamp(h_new_min, h_mean, h_new_max);
+  int h_new = FREESERF_CLAMP(h_new_min, h_mean, h_new_max);
 
   return h_new;
 }

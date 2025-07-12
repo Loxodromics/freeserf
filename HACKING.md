@@ -2,15 +2,36 @@
 Build from repository
 ----------------------------
 
-This project uses the [CMake](https://cmake.org) build system.
+This project uses the [CMake](https://cmake.org) build system with two supported approaches:
+
+### Traditional Build (System Dependencies)
+
 Use the following commands to build (it is recommended to build in a separate directory as shown here):
 
 ``` shell
 $ mkdir build && cd build
-$ cmake ..
-$ make
+$ cmake -G Ninja ..
+$ ninja
 ```
-or select platform dependent [generator](https://cmake.org/cmake/help/v3.0/manual/cmake-generators.7.html) for your favorite IDE.
+
+### Modern Build (Conan 2 Package Manager) - Recommended
+
+For better dependency management and cross-platform consistency:
+
+``` shell
+# Create build directory and install Conan 2 dependencies
+$ mkdir build
+$ conan install . --output-folder=build --build=missing
+
+# Build project with Conan 2
+$ cd build
+$ cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
+$ ninja
+```
+
+You can also select platform dependent [generator](https://cmake.org/cmake/help/v3.0/manual/cmake-generators.7.html) for your favorite IDE.
+
+### Configure Variables (Traditional Build Only)
 
 Some useful configure variables (set as environment variable or with `-D` command line option):
 
@@ -21,9 +42,20 @@ Some useful configure variables (set as environment variable or with `-D` comman
 Dependencies
 ------------
 
+### Traditional Build Dependencies
+
 * [SDL2](https://github.com/libsdl-org/SDL/releases) (Development Libraries)
 * [SDL2_mixer](https://github.com/libsdl-org/SDL_mixer/releases) (Optional; for audio playback) (Development Libraries)
 * [SDL2_image](https://github.com/libsdl-org/SDL_image/releases) (Optional; for custom resources) (Development Libraries)
+
+### Conan 2 Build Dependencies
+
+* [Conan 2.0+](https://conan.io/) package manager
+* All other dependencies are automatically managed through `conanfile.py`:
+  - sdl/2.28.3
+  - sdl_mixer/2.8.0 (optional)
+  - sdl_image/2.8.2 (optional)
+  - gtest/1.14.0 (for tests)
 
 Coding style
 ------------
@@ -33,7 +65,11 @@ For the C++ code we are following the [Google C++ Style Guide](http://google.git
 You can check style during the build
 
 ``` shell
+# Traditional build
 $ make check_style
+
+# Ninja builds (both traditional and Conan)
+$ ninja check_style
 ```
 
 

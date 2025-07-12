@@ -29,7 +29,7 @@
 /* Get the resulting value from a click on a slider bar. */
 int
 gui_get_slider_click_value(int x) {
-  return 1310 * clamp(0, x - 7, 50);
+  return 1310 * FREESERF_CLAMP(0, x - 7, 50);
 }
 
 void

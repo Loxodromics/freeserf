@@ -280,7 +280,7 @@ Minimap::handle_scroll(int up) {
     scale_ = scale - 1;
   }
 
-  set_scale(clamp(1, scale_, max_scale));
+  set_scale(FREESERF_CLAMP(1, scale_, max_scale));
 
   return 0;
 }

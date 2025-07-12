@@ -26,6 +26,6 @@
 #define BIT_TEST(x, n)    ((x) & BIT(n))
 #define BIT_INVERT(x, n)  ((x) ^= 1 << (n))
 
-#define clamp(l, x, h)  (std::max((l), std::min((x), (h))))
+#define FREESERF_CLAMP(l, x, h)  (std::max((l), std::min((x), (h))))
 
 #endif  // SRC_MISC_H_
