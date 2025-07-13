@@ -107,7 +107,6 @@ VideoSDL::VideoSDL() {
 #ifdef USE_SDL3
   // In SDL3, use a standard 32-bit RGBA format
   pixel_format = SDL_PIXELFORMAT_RGBA8888;
-  
   /* Initialize color component masks for screen surface */
   int bpp;
   if (!SDL_GetMasksForPixelFormat((SDL_PixelFormat)pixel_format, &bpp,
@@ -191,7 +190,8 @@ VideoSDL::set_resolution(unsigned int width, unsigned int height, bool fs) {
   /* Set logical size of screen */
   r = SDL_RenderSetLogicalSize(renderer, width, height);
   if (SDL_CHECK_ERROR(r)) {
-    Log::Info["video"] << "Logical presentation not supported, continuing without it";
+    Log::Info["video"] << "Logical presentation not supported, "
+                         << "continuing without it";
   }
 
   fullscreen = fs;
@@ -274,7 +274,8 @@ VideoSDL::create_surface_from_data(void *data, int width, int height) {
 
   /* Covert to screen format */
 #ifdef USE_SDL3
-  SDL_Surface *surf_screen = SDL_ConvertSurface(surf, (SDL_PixelFormat)pixel_format);
+  SDL_Surface *surf_screen = SDL_ConvertSurface(surf,
+                                                (SDL_PixelFormat)pixel_format);
 #else
   SDL_Surface *surf_screen = SDL_ConvertSurfaceFormat(surf, pixel_format, 0);
 #endif
@@ -408,10 +409,8 @@ void
 VideoSDL::swap_buffers() {
   SDL_SetRenderTarget(renderer, nullptr);
   SDL_RenderCopy(renderer, screen->texture, nullptr, nullptr);
-  
   /* Flush renderer before presenting (required for SDL3 batching) */
   SDL_COMPAT_FLUSH_RENDERER(renderer);
-  
   SDL_RenderPresent(renderer);
 }
 

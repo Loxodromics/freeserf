@@ -56,7 +56,8 @@ EventLoopSDL::EventLoopSDL()
 
 #ifdef USE_SDL3
 Uint32
-EventLoopSDL::timer_callback(void *userdata, SDL_TimerID timerID, Uint32 interval) {
+EventLoopSDL::timer_callback(void *userdata, SDL_TimerID timerID,
+                             Uint32 interval) {
   EventLoopSDL *eventLoop = static_cast<EventLoopSDL*>(userdata);
 #else
 Uint32
@@ -129,18 +130,24 @@ EventLoopSDL::run() {
         }
 
         if (event.button.button <= 3) {
-          int x = static_cast<int>(static_cast<float>(SDL_COMPAT_MOUSE_X(event)) *
-                                   zoom_factor * screen_factor_x);
-          int y = static_cast<int>(static_cast<float>(SDL_COMPAT_MOUSE_Y(event)) *
-                                   zoom_factor * screen_factor_y);
+          int x = static_cast<int>(
+              static_cast<float>(SDL_COMPAT_MOUSE_X(event)) *
+              zoom_factor * screen_factor_x);
+          int y = static_cast<int>(
+              static_cast<float>(SDL_COMPAT_MOUSE_Y(event)) *
+              zoom_factor * screen_factor_y);
           notify_click(x, y, (Event::Button)event.button.button);
 
           if (current_ticks - last_click[event.button.button] <
                 MOUSE_TIME_SENSITIVITY &&
-              SDL_COMPAT_MOUSE_X(event) >= (last_click_x - MOUSE_MOVE_SENSITIVITY) &&
-              SDL_COMPAT_MOUSE_X(event) <= (last_click_x + MOUSE_MOVE_SENSITIVITY) &&
-              SDL_COMPAT_MOUSE_Y(event) >= (last_click_y - MOUSE_MOVE_SENSITIVITY) &&
-              SDL_COMPAT_MOUSE_Y(event) <= (last_click_y + MOUSE_MOVE_SENSITIVITY)) {
+              SDL_COMPAT_MOUSE_X(event) >=
+                  (last_click_x - MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_X(event) <=
+                  (last_click_x + MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_Y(event) >=
+                  (last_click_y - MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_Y(event) <=
+                  (last_click_y + MOUSE_MOVE_SENSITIVITY)) {
             notify_dbl_click(x, y, (Event::Button)event.button.button);
           }
 
@@ -275,7 +282,8 @@ EventLoopSDL::run() {
         notify_key_pressed('c', 1);
         break;
       case SDL_WINDOWEVENT:
-        if (SDL_WINDOWEVENT_SIZE_CHANGED == SDL_COMPAT_WINDOW_EVENT_TYPE(event)) {
+        if (SDL_WINDOWEVENT_SIZE_CHANGED ==
+            SDL_COMPAT_WINDOW_EVENT_TYPE(event)) {
           unsigned int width = SDL_COMPAT_WINDOW_DATA1(event);
           unsigned int height = SDL_COMPAT_WINDOW_DATA2(event);
           gfx.set_resolution(width, height, gfx.is_fullscreen());

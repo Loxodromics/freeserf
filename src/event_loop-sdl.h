@@ -51,7 +51,12 @@ class EventLoopSDL : public EventLoop {
 
  protected:
   void zoom(float delta);
+#ifdef USE_SDL3
+  static Uint32 timer_callback(void *userdata, SDL_TimerID timerID,
+                               Uint32 interval);
+#else
   static Uint32 timer_callback(Uint32 interval, void *param);
+#endif
 };
 
 #endif  // SRC_EVENT_LOOP_SDL_H_
