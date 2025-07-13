@@ -25,8 +25,7 @@
 #include <exception>
 #include <string>
 
-#include <SDL.h>
-
+#include "src/sdl_compat.h"
 #include "src/video.h"
 
 class Video::Frame {

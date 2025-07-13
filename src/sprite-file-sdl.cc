@@ -21,7 +21,7 @@
 
 #include "src/sprite-file.h"
 
-#include <SDL_image.h>
+#include "src/sdl_compat.h"
 
 SpriteFile::SpriteFile() {
   IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG | IMG_INIT_TIF);

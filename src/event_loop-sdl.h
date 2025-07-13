@@ -23,8 +23,8 @@
 #define SRC_EVENT_LOOP_SDL_H_
 
 #include <list>
-#include <SDL.h>
 
+#include "src/sdl_compat.h"
 #include "src/event_loop.h"
 
 class EventLoopSDL : public EventLoop {

@@ -21,8 +21,6 @@
 
 #include "src/event_loop-sdl.h"
 
-#include <SDL.h>
-
 #include "src/log.h"
 #include "src/gfx.h"
 #include "src/freeserf.h"

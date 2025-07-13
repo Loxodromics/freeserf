@@ -34,7 +34,7 @@
 #include "src/command_line.h"
 
 #ifdef WIN32
-# include <SDL.h>
+# include "src/sdl_compat.h"
 #endif  // WIN32
 
 int

@@ -23,8 +23,6 @@
 
 #include <sstream>
 
-#include <SDL.h>
-
 ExceptionSDL::ExceptionSDL(const std::string &description) throw()
   : ExceptionVideo(description) {
   sdl_error = SDL_GetError();
