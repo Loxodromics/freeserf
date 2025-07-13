@@ -81,8 +81,22 @@
 #define SDL_COMPAT_MOUSE_Y(event) ((int)(event).button.y)
 
 // SDL3 event system changes
+#define SDL_WINDOWEVENT SDL_EVENT_WINDOW_RESIZED
 #define SDL_WINDOWEVENT_CLOSE SDL_EVENT_WINDOW_CLOSE_REQUESTED
 #define SDL_WINDOWEVENT_SIZE_CHANGED SDL_EVENT_WINDOW_RESIZED
+#define SDL_QUIT SDL_EVENT_QUIT
+
+// SDL3 input event changes
+#define SDL_KEYDOWN SDL_EVENT_KEY_DOWN
+#define SDL_MOUSEBUTTONUP SDL_EVENT_MOUSE_BUTTON_UP
+#define SDL_MOUSEBUTTONDOWN SDL_EVENT_MOUSE_BUTTON_DOWN
+#define SDL_MOUSEMOTION SDL_EVENT_MOUSE_MOTION
+#define SDL_MOUSEWHEEL SDL_EVENT_MOUSE_WHEEL
+
+// SDL3 event structure compatibility macros
+#define SDL_COMPAT_WINDOW_EVENT_TYPE(event) (event.type)
+#define SDL_COMPAT_WINDOW_DATA1(event) (event.window.data1)
+#define SDL_COMPAT_WINDOW_DATA2(event) (event.window.data2)
 
 // SDL3 gamepad renames (if used)
 #define SDL_GameController SDL_Gamepad
@@ -107,6 +121,11 @@
 #define SDL_RenderSetLogicalSize SDL_RenderSetLogicalSize
 #define SDL_COMPAT_SET_TEXTURE_FILTERING(texture) ((void)0)
 #define SDL_COMPAT_FLUSH_RENDERER(renderer) ((void)0)
+
+// SDL2 event structure compatibility macros
+#define SDL_COMPAT_WINDOW_EVENT_TYPE(event) (event.window.event)
+#define SDL_COMPAT_WINDOW_DATA1(event) (event.window.data1)
+#define SDL_COMPAT_WINDOW_DATA2(event) (event.window.data2)
 
 // SDL2 function names are unchanged
 // (macros already defined to themselves above)

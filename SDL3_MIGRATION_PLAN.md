@@ -126,10 +126,16 @@
   - [x] Implemented SDL_SetRenderLogicalPresentation compatibility for logical sizing
   - [x] Added texture filtering configuration for pixel art (nearest neighbor filtering)
   - [x] Integrated SDL_FlushRenderer calls for SDL3 mandatory batching support
+- [x] **Phase 3.2 Complete: EventLoopSDL Class Modifications**
+  - [x] Enhanced compatibility layer with SDL3 event system mappings
+  - [x] Updated window event handling for SDL3's flattened event structure
+  - [x] Migrated SDL_WINDOWEVENT to direct SDL3 window events
+  - [x] Updated mouse coordinate handling for SDL3 float precision in double-click detection
+  - [x] Added comprehensive event type mappings (keyboard, mouse, window, quit events)
 
 ### Current Status
-- Status: Phase 3.1 VideoSDL Class Modifications completed successfully
-- Next: Continue with Phase 3.2 - EventLoopSDL Class Modifications
+- Status: Phase 3.2 EventLoopSDL Class Modifications completed successfully
+- Next: Continue with Phase 3.3 - AudioSDL Class Overhaul
 
 ### Notes & Issues
 - None yet

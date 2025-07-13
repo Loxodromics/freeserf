@@ -131,10 +131,10 @@ EventLoopSDL::run() {
 
           if (current_ticks - last_click[event.button.button] <
                 MOUSE_TIME_SENSITIVITY &&
-              event.button.x >= (last_click_x - MOUSE_MOVE_SENSITIVITY) &&
-              event.button.x <= (last_click_x + MOUSE_MOVE_SENSITIVITY) &&
-              event.button.y >= (last_click_y - MOUSE_MOVE_SENSITIVITY) &&
-              event.button.y <= (last_click_y + MOUSE_MOVE_SENSITIVITY)) {
+              SDL_COMPAT_MOUSE_X(event) >= (last_click_x - MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_X(event) <= (last_click_x + MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_Y(event) >= (last_click_y - MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_Y(event) <= (last_click_y + MOUSE_MOVE_SENSITIVITY)) {
             notify_dbl_click(x, y, (Event::Button)event.button.button);
           }
 
@@ -260,9 +260,9 @@ EventLoopSDL::run() {
         notify_key_pressed('c', 1);
         break;
       case SDL_WINDOWEVENT:
-        if (SDL_WINDOWEVENT_SIZE_CHANGED == event.window.event) {
-          unsigned int width = event.window.data1;
-          unsigned int height = event.window.data2;
+        if (SDL_WINDOWEVENT_SIZE_CHANGED == SDL_COMPAT_WINDOW_EVENT_TYPE(event)) {
+          unsigned int width = SDL_COMPAT_WINDOW_DATA1(event);
+          unsigned int height = SDL_COMPAT_WINDOW_DATA2(event);
           gfx.set_resolution(width, height, gfx.is_fullscreen());
           gfx.get_screen_factor(&screen_factor_x, &screen_factor_y);
           float factor = (gfx.get_zoom_factor() - 1);
