@@ -50,7 +50,7 @@ VideoSDL::VideoSDL() {
   }
 
   /* Initialize defaults and Video subsystem */
-  if (SDL_VideoInit(NULL) != 0) {
+  if (SDL_CHECK_ERROR(SDL_VideoInit(NULL))) {
     throw ExceptionSDL("Unable to initialize SDL video");
   }
 
@@ -133,7 +133,7 @@ VideoSDL::set_resolution(unsigned int width, unsigned int height, bool fs) {
   /* Set fullscreen mode */
   int r = SDL_SetWindowFullscreen(window,
                                   fs ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDL("Unable to set window fullscreen");
   }
 
@@ -149,7 +149,7 @@ VideoSDL::set_resolution(unsigned int width, unsigned int height, bool fs) {
 
   /* Set logical size of screen */
   r = SDL_RenderSetLogicalSize(renderer, width, height);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDL("Unable to set logical size");
   }
 
@@ -287,7 +287,7 @@ VideoSDL::draw_image(const Video::Image *image, int x, int y, int y_offset,
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   int r = SDL_RenderCopy(renderer, image->texture, &src_rect, &dest_rect);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDL("RenderCopy error");
   }
 }
@@ -301,7 +301,7 @@ VideoSDL::draw_frame(int dx, int dy, Video::Frame *dest, int sx, int sy,
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   int r = SDL_RenderCopy(renderer, src->texture, &src_rect, &dest_rect);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDL("RenderCopy error");
   }
 }
@@ -325,7 +325,7 @@ VideoSDL::fill_rect(int x, int y, unsigned int width, unsigned int height,
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 0xff);
   int r = SDL_RenderFillRect(renderer, &rect);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDL("RenderFillRect error");
   }
 }

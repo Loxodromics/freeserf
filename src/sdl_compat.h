@@ -57,6 +57,31 @@
 #define SDL_RenderCopy SDL_RenderTexture
 #define SDL_RenderCopyEx SDL_RenderTextureRotated
 
+// SDL3 audio function changes
+#define SDL_OpenAudioDevice SDL_OpenAudioDeviceStream
+#define SDL_PauseAudioDevice SDL_ResumeAudioDevice
+#define SDL_LoadWAV_RW SDL_LoadWAV_IO
+#define SDL_RWFromMem SDL_IOFromMem
+
+// SDL3 window/renderer creation changes
+#define SDL_CreateRenderer(window, index, flags) SDL_CreateRenderer(window, NULL)
+
+// SDL3 rendering function renames
+#define SDL_GetRendererOutputSize SDL_GetCurrentRenderOutputSize
+
+// SDL3 mouse coordinate changes (now float)
+#define SDL_COMPAT_MOUSE_X(event) ((int)(event).button.x)
+#define SDL_COMPAT_MOUSE_Y(event) ((int)(event).button.y)
+
+// SDL3 event system changes
+#define SDL_WINDOWEVENT_CLOSE SDL_EVENT_WINDOW_CLOSE_REQUESTED
+#define SDL_WINDOWEVENT_SIZE_CHANGED SDL_EVENT_WINDOW_RESIZED
+
+// SDL3 gamepad renames (if used)
+#define SDL_GameController SDL_Gamepad
+#define SDL_GameControllerOpen SDL_OpenGamepad
+#define SDL_IsGameController SDL_IsGamepad
+
 #else  // SDL2
 
 // SDL2 uses int return values (0 for success, negative for error)
@@ -66,6 +91,10 @@
 // SDL2 event structure compatibility
 #define SDL_COMPAT_KEY(event) ((event).key.keysym.sym)
 #define SDL_COMPAT_BUTTON_STATE(event) ((event).button.state == SDL_PRESSED)
+
+// SDL2 mouse coordinates are already int
+#define SDL_COMPAT_MOUSE_X(event) ((event).button.x)
+#define SDL_COMPAT_MOUSE_Y(event) ((event).button.y)
 
 // SDL2 function names are unchanged
 // (macros already defined to themselves above)

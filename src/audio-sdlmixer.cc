@@ -49,7 +49,7 @@ AudioSDL::AudioSDL() {
     Log::Info["audio"] << "\t" << SDL_GetAudioDriver(i);
   }
 
-  if (SDL_AudioInit(NULL) != 0) {
+  if (SDL_CHECK_ERROR(SDL_AudioInit(NULL))) {
     throw ExceptionSDLmixer("Could not init SDL audio");
   }
 
@@ -73,7 +73,7 @@ AudioSDL::AudioSDL() {
   }
 
   r = Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 512);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDLmixer("Could not open audio device");
   }
 
@@ -209,7 +209,7 @@ AudioSDL::TrackSFX::~TrackSFX() {
 void
 AudioSDL::TrackSFX::play() {
   int r = Mix_PlayChannel(-1, chunk, 0);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     Log::Error["audio:SDL_mixer"] << "Could not play SFX clip: "
                                   << Mix_GetError();
   }
@@ -346,7 +346,7 @@ AudioSDL::TrackMIDI::~TrackMIDI() {
 void
 AudioSDL::TrackMIDI::play() {
   int r = Mix_PlayMusic(chunk, 0);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     Log::Warn["audio:SDL_mixer"] << "Could not play MIDI track: "
                                  << Mix_GetError();
     PlayerMIDI::music_finished_hook();

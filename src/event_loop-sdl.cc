@@ -43,7 +43,9 @@ EventLoopSDL::EventLoopSDL()
   : zoom_factor(1.f)
   , screen_factor_x(1.f)
   , screen_factor_y(1.f) {
-  SDL_InitSubSystem(SDL_INIT_EVENTS | SDL_INIT_TIMER);
+  if (SDL_CHECK_ERROR(SDL_InitSubSystem(SDL_INIT_EVENTS | SDL_INIT_TIMER))) {
+    throw ExceptionFreeserf("Failed to initialize SDL subsystems");
+  }
 
   eventUserTypeStep = SDL_RegisterEvents(2);
   if (eventUserTypeStep == (Uint32)-1) {
@@ -121,9 +123,9 @@ EventLoopSDL::run() {
         }
 
         if (event.button.button <= 3) {
-          int x = static_cast<int>(static_cast<float>(event.button.x) *
+          int x = static_cast<int>(static_cast<float>(SDL_COMPAT_MOUSE_X(event)) *
                                    zoom_factor * screen_factor_x);
-          int y = static_cast<int>(static_cast<float>(event.button.y) *
+          int y = static_cast<int>(static_cast<float>(SDL_COMPAT_MOUSE_Y(event)) *
                                    zoom_factor * screen_factor_y);
           notify_click(x, y, (Event::Button)event.button.button);
 
@@ -137,8 +139,8 @@ EventLoopSDL::run() {
           }
 
           last_click[event.button.button] = current_ticks;
-          last_click_x = event.button.x;
-          last_click_y = event.button.y;
+          last_click_x = SDL_COMPAT_MOUSE_X(event);
+          last_click_y = SDL_COMPAT_MOUSE_Y(event);
         }
         break;
       case SDL_MOUSEBUTTONDOWN:
@@ -179,7 +181,7 @@ EventLoopSDL::run() {
         break;
       }
       case SDL_KEYDOWN: {
-        if (event.key.keysym.sym == SDLK_q &&
+        if (SDL_COMPAT_KEY(event) == SDLK_q &&
             (event.key.keysym.mod & KMOD_CTRL)) {
           quit();
           break;
@@ -196,7 +198,7 @@ EventLoopSDL::run() {
           modifier |= 4;
         }
 
-        switch (event.key.keysym.sym) {
+        switch (SDL_COMPAT_KEY(event)) {
           // Map scroll
           case SDLK_UP: {
             notify_drag(0, 0, 0, -32, Event::ButtonLeft);
@@ -232,7 +234,7 @@ EventLoopSDL::run() {
             } else {
                 // if this isn't handled the 'f' key
                 // doesn't work for savegame names
-                notify_key_pressed(event.key.keysym.sym, modifier);
+                notify_key_pressed(SDL_COMPAT_KEY(event), modifier);
             }
             break;
           case SDLK_RIGHTBRACKET:
@@ -248,7 +250,7 @@ EventLoopSDL::run() {
             break;
 
           default:
-            notify_key_pressed(event.key.keysym.sym, modifier);
+            notify_key_pressed(SDL_COMPAT_KEY(event), modifier);
             break;
         }
 
