@@ -10,10 +10,11 @@ class FreeSerfConan(ConanFile):
         if self.options.use_sdl3:
             # SDL3 packages (when available in Conan)
             # Note: SDL3 packages may not be available in Conan yet
-            # This is prepared for when they become available
-            self.requires("sdl/3.0.0", override=True)
-            self.requires("sdl_mixer/3.0.0") 
-            self.requires("sdl_image/3.0.0")
+            # These versions reflect SDL3 release candidates and future releases
+            # Update to stable versions when available
+            self.requires("sdl/3.1.3", override=True)  # Latest SDL3 version
+            self.requires("sdl_mixer/3.0.0")           # SDL3_mixer future version
+            self.requires("sdl_image/3.0.0")           # SDL3_image future version
         else:
             # Use the lowest common SDL2 version that all packages support
             self.requires("sdl/2.28.3", override=True)

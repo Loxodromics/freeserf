@@ -40,13 +40,34 @@ ninja test
 ninja check_style
 ```
 
+### SDL3 Build (experimental)
+```bash
+# Traditional Build with SDL3
+mkdir build && cd build
+cmake -G Ninja -DUSE_SDL3=ON ..
+ninja
+
+# Conan 2 Build with SDL3 (when packages become available)
+mkdir build
+conan install . --output-folder=build --build=missing -o use_sdl3=True
+cd build
+cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=ON
+ninja
+
+# Run tests
+ninja test
+
+# Check code style
+ninja check_style
+```
+
 ## Code Architecture
 
 ### Core Libraries
 
 - **tools**: Utility functions (debug, log, configfile, buffer)
 - **game**: Core game logic (buildings, flags, serfs, map, players, AI)
-- **platform**: Platform abstraction (video, audio, event handling via SDL2)
+- **platform**: Platform abstraction (video, audio, event handling via SDL2/SDL3)
 - **data**: Resource management (DOS/Amiga data files, sprites, audio conversion)
 
 ### Main Components
@@ -67,17 +88,16 @@ ninja check_style
 ## Dependencies
 
 ### Traditional Build
-- SDL2 (required)
-- SDL2_mixer (optional, for audio)
-- SDL2_image (optional, for custom resources)
+- SDL2 (required) or SDL3 (experimental)
+- SDL2_mixer/SDL3_mixer (optional, for audio)
+- SDL2_image/SDL3_image (optional, for custom resources)
 - GoogleTest (automatically downloaded for tests)
 
 ### Conan 2 Build
 - Conan 2.0+ package manager
 - All dependencies managed through `conanfile.py`:
-  - sdl/2.28.3
-  - sdl_mixer/2.8.0 (optional)
-  - sdl_image/2.8.2 (optional)
+  - SDL2: sdl/2.28.3, sdl_mixer/2.8.0, sdl_image/2.8.2
+  - SDL3: sdl/3.1.3, sdl_mixer/3.0.0, sdl_image/3.0.0 (when available)
   - gtest/1.14.0 (for tests)
 
 ## Testing

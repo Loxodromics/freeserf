@@ -5,6 +5,7 @@ option(ENABLE_SDL_MIXER "Enable audio support using SDL_mixer" ON)
 option(ENABLE_SDL_IMAGE "Enable image loading using SDL_image" ON)
 
 if(USE_SDL3)
+  add_definitions(-DUSE_SDL3)
   find_package(SDL3 REQUIRED)
   if(ENABLE_SDL_MIXER)
     find_package(SDL3_mixer REQUIRED)
