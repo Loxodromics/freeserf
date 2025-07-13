@@ -40,18 +40,39 @@ ninja test
 ninja check_style
 ```
 
-### SDL3 Build (experimental)
+### SDL3 Build (default)
 ```bash
-# Traditional Build with SDL3
+# Traditional Build with SDL3 (default)
 mkdir build && cd build
-cmake -G Ninja -DUSE_SDL3=ON ..
+cmake -G Ninja ..
 ninja
 
-# Conan 2 Build with SDL3 (when packages become available)
+# Conan 2 Build with SDL3
 mkdir build
-conan install . --output-folder=build --build=missing -o use_sdl3=True
+conan install . --output-folder=build --build=missing
 cd build
-cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=ON
+cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
+ninja
+
+# Run tests
+ninja test
+
+# Check code style
+ninja check_style
+```
+
+### SDL2 Build (legacy)
+```bash
+# Traditional Build with SDL2
+mkdir build && cd build
+cmake -G Ninja -DUSE_SDL3=OFF ..
+ninja
+
+# Conan 2 Build with SDL2 (when needed)
+mkdir build
+conan install . --output-folder=build --build=missing -o use_sdl3=False
+cd build
+cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=OFF
 ninja
 
 # Run tests
@@ -88,17 +109,23 @@ ninja check_style
 ## Dependencies
 
 ### Traditional Build
-- SDL2 (required) or SDL3 (experimental)
-- SDL2_mixer/SDL3_mixer (optional, for audio)
-- SDL2_image/SDL3_image (optional, for custom resources)
+- SDL3 (default) or SDL2 (legacy support)
+- SDL3_mixer/SDL2_mixer (temporarily disabled for SDL3, optional for audio)
+- SDL3_image/SDL2_image (temporarily disabled for SDL3, optional for custom resources)
 - GoogleTest (automatically downloaded for tests)
 
 ### Conan 2 Build
 - Conan 2.0+ package manager
 - All dependencies managed through `conanfile.py`:
-  - SDL2: sdl/2.28.3, sdl_mixer/2.8.0, sdl_image/2.8.2
-  - SDL3: sdl/3.1.3, sdl_mixer/3.0.0, sdl_image/3.0.0 (when available)
+  - SDL3: Built from source via FetchContent (default)
+  - SDL2: sdl/2.28.3, sdl_mixer/2.8.0, sdl_image/2.8.2 (legacy)
   - gtest/1.14.0 (for tests)
+
+### SDL3 Migration Status
+- **Core SDL3**: ✅ Complete - Video, events, rendering, timers
+- **SDL3_mixer**: ⏳ Temporarily disabled - Will be re-enabled when stable packages available
+- **SDL3_image**: ⏳ Temporarily disabled - Will be re-enabled when stable packages available
+- **Compatibility Layer**: ✅ Complete - `src/sdl_compat.h` provides SDL2/SDL3 abstraction
 
 ## Testing
 

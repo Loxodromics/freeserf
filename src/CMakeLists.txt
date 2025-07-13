@@ -1,18 +1,20 @@
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
-option(USE_SDL3 "Use SDL3 instead of SDL2" OFF)
-option(ENABLE_SDL_MIXER "Enable audio support using SDL_mixer" ON)
-option(ENABLE_SDL_IMAGE "Enable image loading using SDL_image" ON)
+option(USE_SDL3 "Use SDL3 instead of SDL2" ON)
+option(ENABLE_SDL_MIXER "Enable audio support using SDL_mixer" OFF)  # Temporarily disabled for SDL3
+option(ENABLE_SDL_IMAGE "Enable image loading using SDL_image" OFF)  # Temporarily disabled for SDL3
 
 if(USE_SDL3)
   add_definitions(-DUSE_SDL3)
-  find_package(SDL3 REQUIRED)
+  add_definitions(-DSDL_NO_COMPAT=1)  # Disable SDL3's compatibility layer
   if(ENABLE_SDL_MIXER)
-    find_package(SDL3_mixer REQUIRED)
+    add_definitions(-DENABLE_SDL_MIXER)
   endif()
   if(ENABLE_SDL_IMAGE)
-    find_package(SDL3_image REQUIRED)
+    add_definitions(-DENABLE_SDL_IMAGE)
   endif()
+  # SDL3, SDL3_mixer and SDL3_image are built from source via FetchContent
+  # Their targets are created by the FetchSDL module
 else()
   find_package(SDL2 REQUIRED)
   if(ENABLE_SDL_MIXER)
@@ -81,7 +83,8 @@ target_check_style(game)
 
 set(PLATFORM_SOURCES video.cc
                      audio.cc
-                     event_loop.cc)
+                     event_loop.cc
+                     sdl_compat.cc)
 
 set(PLATFORM_HEADERS video.h
                      audio.h
@@ -101,7 +104,7 @@ endif()
 add_library(platform STATIC ${PLATFORM_SOURCES} ${PLATFORM_HEADERS})
 if(USE_SDL3)
   target_link_libraries(platform SDL3::SDL3)
-  if(ENABLE_SDL_MIXER)
+  if(ENABLE_SDL_MIXER AND TARGET SDL3_mixer::SDL3_mixer)
     target_link_libraries(platform SDL3_mixer::SDL3_mixer)
   endif()
 else()
@@ -146,7 +149,10 @@ endif()
 add_library(data STATIC ${DATA_SOURCES} ${DATA_HEADERS})
 if(ENABLE_SDL_IMAGE)
   if(USE_SDL3)
-    target_link_libraries(data SDL3::SDL3 SDL3_image::SDL3_image)
+    target_link_libraries(data SDL3::SDL3)
+    if(TARGET SDL3_image::SDL3_image)
+      target_link_libraries(data SDL3_image::SDL3_image)
+    endif()
   else()
     target_link_libraries(data SDL2::SDL2 SDL2_image::SDL2_image)
   endif()
@@ -196,10 +202,10 @@ target_check_style(FreeSerf)
 target_link_libraries(FreeSerf game platform data tools)
 if(USE_SDL3)
   target_link_libraries(FreeSerf SDL3::SDL3)
-  if(ENABLE_SDL_MIXER)
+  if(ENABLE_SDL_MIXER AND TARGET SDL3_mixer::SDL3_mixer)
     target_link_libraries(FreeSerf SDL3_mixer::SDL3_mixer)
   endif()
-  if(ENABLE_SDL_IMAGE)
+  if(ENABLE_SDL_IMAGE AND TARGET SDL3_image::SDL3_image)
     target_link_libraries(FreeSerf SDL3_image::SDL3_image)
   endif()
 else()

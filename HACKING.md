@@ -14,6 +14,8 @@ $ cmake -G Ninja ..
 $ ninja
 ```
 
+**Note**: SDL3 is now the default. To use SDL2, add `-DUSE_SDL3=OFF` to the cmake command.
+
 ### Modern Build (Conan 2 Package Manager) - Recommended
 
 For better dependency management and cross-platform consistency:
@@ -35,15 +37,21 @@ You can also select platform dependent [generator](https://cmake.org/cmake/help/
 
 Some useful configure variables (set as environment variable or with `-D` command line option):
 
-* `SDL2_DIR` - path to SDL2 root directory
-* `SDL2_mixer_DIR` - path to SDL2_mixer root directory (optional)
-* `SDL2_image_DIR` - path to SDL2_image root directory (optional)
+* `USE_SDL3` - Use SDL3 instead of SDL2 (default: ON)
+* `SDL2_DIR` - path to SDL2 root directory (for SDL2 builds)
+* `SDL2_mixer_DIR` - path to SDL2_mixer root directory (optional, for SDL2 builds)
+* `SDL2_image_DIR` - path to SDL2_image root directory (optional, for SDL2 builds)
 
 Dependencies
 ------------
 
 ### Traditional Build Dependencies
 
+**SDL3 Build (Default)**:
+* SDL3 is automatically built from source via CMake FetchContent
+* No manual dependency installation required
+
+**SDL2 Build (Legacy)**:
 * [SDL2](https://github.com/libsdl-org/SDL/releases) (Development Libraries)
 * [SDL2_mixer](https://github.com/libsdl-org/SDL_mixer/releases) (Optional; for audio playback) (Development Libraries)
 * [SDL2_image](https://github.com/libsdl-org/SDL_image/releases) (Optional; for custom resources) (Development Libraries)
@@ -52,10 +60,18 @@ Dependencies
 
 * [Conan 2.0+](https://conan.io/) package manager
 * All other dependencies are automatically managed through `conanfile.py`:
-  - sdl/2.28.3
-  - sdl_mixer/2.8.0 (optional)
-  - sdl_image/2.8.2 (optional)
+  - SDL3: Built from source via FetchContent (default)
+  - SDL2: sdl/2.28.3 (legacy support)
+  - sdl_mixer/2.8.0 (optional, SDL2 only)
+  - sdl_image/2.8.2 (optional, SDL2 only)
   - gtest/1.14.0 (for tests)
+
+### SDL3 Migration Status
+
+* **Core SDL3**: ✅ Complete (video, events, rendering, timers)
+* **SDL3_mixer**: ⏳ Temporarily disabled (audio currently uses dummy implementation)
+* **SDL3_image**: ⏳ Temporarily disabled (sprite loading uses dummy implementation)
+* **Compatibility**: ✅ SDL2/SDL3 compatibility layer in `src/sdl_compat.h`
 
 Coding style
 ------------

@@ -24,14 +24,92 @@
 
 // Include appropriate SDL headers based on build configuration
 #ifdef USE_SDL3
+  // Disable SDL3's compatibility layer to avoid conflicts (must be before includes)
+  #define SDL_NO_COMPAT 1
   #include <SDL3/SDL.h>
   #include <SDL3/SDL_main.h>
-  #ifdef ENABLE_SDL_MIXER
-    #include <SDL3_mixer/SDL_mixer.h>
+  
+  // Undefine problematic SDL3 oldnames.h macros that conflict with our compatibility layer
+  #ifdef SDL_USEREVENT
+    #undef SDL_USEREVENT
   #endif
-  #ifdef ENABLE_SDL_IMAGE
-    #include <SDL3_image/SDL_image.h>
+  #ifdef SDL_KEYDOWN  
+    #undef SDL_KEYDOWN
   #endif
+  #ifdef SDL_MOUSEBUTTONUP
+    #undef SDL_MOUSEBUTTONUP
+  #endif
+  #ifdef SDL_MOUSEBUTTONDOWN
+    #undef SDL_MOUSEBUTTONDOWN
+  #endif
+  #ifdef SDL_MOUSEMOTION
+    #undef SDL_MOUSEMOTION
+  #endif
+  #ifdef SDL_MOUSEWHEEL
+    #undef SDL_MOUSEWHEEL
+  #endif
+  #ifdef SDL_QUIT
+    #undef SDL_QUIT
+  #endif
+  #ifdef SDL_WINDOWEVENT_CLOSE
+    #undef SDL_WINDOWEVENT_CLOSE
+  #endif
+  #ifdef SDL_WINDOWEVENT_SIZE_CHANGED
+    #undef SDL_WINDOWEVENT_SIZE_CHANGED
+  #endif
+  #ifdef KMOD_CTRL
+    #undef KMOD_CTRL
+  #endif
+  #ifdef KMOD_SHIFT
+    #undef KMOD_SHIFT
+  #endif
+  #ifdef KMOD_ALT
+    #undef KMOD_ALT
+  #endif
+  #ifdef SDL_BUTTON
+    #undef SDL_BUTTON
+  #endif
+  #ifdef SDL_RenderCopy
+    #undef SDL_RenderCopy
+  #endif
+  #ifdef SDL_RenderFillRect
+    #undef SDL_RenderFillRect
+  #endif
+  #ifdef SDL_GetRendererOutputSize
+    #undef SDL_GetRendererOutputSize
+  #endif
+  #ifdef SDL_RenderSetLogicalSize
+    #undef SDL_RenderSetLogicalSize
+  #endif
+  #ifdef SDL_ConvertSurfaceFormat
+    #undef SDL_ConvertSurfaceFormat
+  #endif
+  #ifdef SDL_FreeCursor
+    #undef SDL_FreeCursor
+  #endif
+  #ifdef SDL_FreeSurface
+    #undef SDL_FreeSurface
+  #endif
+  #ifdef SDL_RenderDrawLine
+    #undef SDL_RenderDrawLine
+  #endif
+  #ifdef SDL_GameController
+    #undef SDL_GameController
+  #endif
+  #ifdef SDL_GameControllerOpen
+    #undef SDL_GameControllerOpen
+  #endif
+  #ifdef SDL_IsGameController
+    #undef SDL_IsGameController
+  #endif
+  
+  // TODO: Re-enable when SDL3_mixer/SDL3_image FetchContent is working
+  //#ifdef ENABLE_SDL_MIXER
+  //  #include <SDL3_mixer/SDL_mixer.h>
+  //#endif
+  //#ifdef ENABLE_SDL_IMAGE
+  //  #include <SDL3_image/SDL_image.h>
+  //#endif
 #else
   #include <SDL.h>
   #ifdef ENABLE_SDL_MIXER
@@ -49,19 +127,63 @@
 #define SDL_CHECK_SUCCESS(call) (call)
 #define SDL_CHECK_ERROR(call) (!(call))
 
-// SDL3 event structure changes
+// SDL3 event structure changes  
 #define SDL_COMPAT_KEY(event) ((event).key.key)
 #define SDL_COMPAT_BUTTON_STATE(event) ((event).button.down)
+#define SDL_COMPAT_KEY_MOD(event) ((event).key.mod)
 
-// SDL3 rendering function name changes
-#define SDL_RenderCopy SDL_RenderTexture
-#define SDL_RenderCopyEx SDL_RenderTextureRotated
+// SDL3 compatibility mappings - native SDL3 API equivalents
+#define SDL_USEREVENT SDL_EVENT_USER
+#define SDL_KEYDOWN SDL_EVENT_KEY_DOWN
+#define SDL_MOUSEBUTTONUP SDL_EVENT_MOUSE_BUTTON_UP
+#define SDL_MOUSEBUTTONDOWN SDL_EVENT_MOUSE_BUTTON_DOWN
+#define SDL_MOUSEMOTION SDL_EVENT_MOUSE_MOTION
+#define SDL_MOUSEWHEEL SDL_EVENT_MOUSE_WHEEL
+#define SDL_QUIT SDL_EVENT_QUIT
+#define SDL_WINDOWEVENT SDL_EVENT_WINDOW_RESIZED
+#define SDL_WINDOWEVENT_CLOSE SDL_EVENT_WINDOW_CLOSE_REQUESTED
+#define SDL_WINDOWEVENT_SIZE_CHANGED SDL_EVENT_WINDOW_RESIZED
 
-// SDL3 audio function changes
-#define SDL_OpenAudioDevice SDL_OpenAudioDeviceStream
-#define SDL_PauseAudioDevice SDL_ResumeAudioDevice
-#define SDL_LoadWAV_RW SDL_LoadWAV_IO
-#define SDL_RWFromMem SDL_IOFromMem
+// SDL3 key modifier mappings
+#define KMOD_CTRL SDL_KMOD_CTRL
+#define KMOD_SHIFT SDL_KMOD_SHIFT
+#define KMOD_ALT SDL_KMOD_ALT
+
+// SDL3 mouse button mapping
+#define SDL_BUTTON(x) SDL_BUTTON_MASK(x)
+
+// SDL3 initialization constants
+#define SDL_INIT_TIMER 0x00000001u
+#define SDL_INIT_EVENTS 0x00004000u
+
+// SDL3 timer callback compatibility 
+#define SDL_COMPAT_ADD_TIMER(interval, callback, param) SDL_AddTimer(interval, callback, param)
+
+// Forward declare compatibility functions before macros
+#ifdef __cplusplus
+extern "C" {
+#endif
+bool SDL_RenderCopy_Compat(SDL_Renderer *renderer, SDL_Texture *texture, const SDL_Rect *srcrect, const SDL_Rect *dstrect);
+bool SDL_RenderFillRect_Compat(SDL_Renderer *renderer, const SDL_Rect *rect);
+#ifdef __cplusplus
+}
+#endif
+
+// SDL3 coordinate conversion for rendering (SDL3 uses float coordinates)
+#define SDL_RenderCopy SDL_RenderCopy_Compat
+#define SDL_RenderFillRect SDL_RenderFillRect_Compat
+
+// SDL3 function renames
+#define SDL_GetRendererOutputSize SDL_GetCurrentRenderOutputSize
+#define SDL_RenderSetLogicalSize SDL_SetRenderLogicalPresentation_Compat
+#define SDL_ConvertSurfaceFormat SDL_ConvertSurface
+#define SDL_FreeCursor SDL_DestroyCursor
+#define SDL_FreeSurface SDL_DestroySurface
+#define SDL_CreateRGBSurface SDL_CreateSurface_Compat
+#define SDL_CreateRGBSurfaceFrom SDL_CreateSurfaceFrom_Compat
+#define SDL_VideoQuit() SDL_QuitSubSystem(SDL_INIT_VIDEO)
+#define SDL_GL_GetDrawableSize SDL_GetWindowSizeInPixels
+#define SDL_RenderDrawLine SDL_RenderLine
 
 // SDL3 audio initialization compatibility
 #define SDL_COMPAT_AUDIO_INIT(driver) SDL_InitSubSystem(SDL_INIT_AUDIO)
@@ -71,8 +193,13 @@
 #define SDL_COMPAT_MIX_OPEN_AUDIO(freq, format, channels, chunksize) \
   Mix_OpenAudio(freq, format, channels, chunksize)
 
-// SDL3 window/renderer creation changes
+// SDL3 window/renderer creation changes  
 #define SDL_CreateRenderer(window, index, flags) SDL_CreateRenderer(window, NULL)
+#define SDL_WINDOW_FULLSCREEN_DESKTOP SDL_WINDOW_FULLSCREEN
+
+// SDL3 texture creation compatibility - pixel format parameter handling
+#define SDL_CreateTexture(renderer, format, access, w, h) SDL_CreateTexture(renderer, (SDL_PixelFormat)(format), access, w, h)
+#define SDL_TEXTUREACCESS_TARGET SDL_TEXTUREACCESS_TARGET
 
 // SDL3 rendering function renames
 #define SDL_GetRendererOutputSize SDL_GetCurrentRenderOutputSize
@@ -128,6 +255,7 @@
 // SDL2 event structure compatibility
 #define SDL_COMPAT_KEY(event) ((event).key.keysym.sym)
 #define SDL_COMPAT_BUTTON_STATE(event) ((event).button.state == SDL_PRESSED)
+#define SDL_COMPAT_KEY_MOD(event) ((event).key.keysym.mod)
 
 // SDL2 mouse coordinates are already int
 #define SDL_COMPAT_MOUSE_X(event) ((event).button.x)
@@ -143,6 +271,9 @@
 #define SDL_COMPAT_WINDOW_DATA1(event) (event.window.data1)
 #define SDL_COMPAT_WINDOW_DATA2(event) (event.window.data2)
 
+// SDL2 timer callback compatibility
+#define SDL_COMPAT_ADD_TIMER(interval, callback, param) SDL_AddTimer(interval, callback, param)
+
 // SDL2 function names are unchanged
 // (macros already defined to themselves above)
 
@@ -153,12 +284,23 @@
 #define SDL_LOG_WARN(msg) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, msg)
 #define SDL_LOG_INFO(msg) SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, msg)
 
-// SDL3 compatibility function for logical presentation
+// SDL3 compatibility functions for surface creation and pixel formats
 #ifdef USE_SDL3
 inline int SDL_SetRenderLogicalPresentation_Compat(SDL_Renderer* renderer, int w, int h) {
   return SDL_SetRenderLogicalPresentation(renderer, w, h, 
-                                          SDL_LOGICAL_PRESENTATION_LETTERBOX, 
-                                          SDL_SCALEMODE_LINEAR) ? 0 : -1;
+                                          SDL_LOGICAL_PRESENTATION_LETTERBOX) ? 0 : -1;
+}
+
+inline SDL_Surface* SDL_CreateSurface_Compat(Uint32 flags, int width, int height, int depth,
+                                              Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask) {
+  // In SDL3, use default RGBA8888 format for compatibility
+  return SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA8888);
+}
+
+inline SDL_Surface* SDL_CreateSurfaceFrom_Compat(void* pixels, int width, int height, int depth, int pitch,
+                                                  Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask) {
+  // In SDL3, use default RGBA8888 format for compatibility  
+  return SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, pixels, pitch);
 }
 #endif
 

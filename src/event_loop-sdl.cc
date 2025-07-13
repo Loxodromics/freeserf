@@ -54,9 +54,15 @@ EventLoopSDL::EventLoopSDL()
   eventUserTypeStep++;
 }
 
+#ifdef USE_SDL3
+Uint32
+EventLoopSDL::timer_callback(void *userdata, SDL_TimerID timerID, Uint32 interval) {
+  EventLoopSDL *eventLoop = static_cast<EventLoopSDL*>(userdata);
+#else
 Uint32
 EventLoopSDL::timer_callback(Uint32 interval, void *param) {
   EventLoopSDL *eventLoop = static_cast<EventLoopSDL*>(param);
+#endif
   SDL_Event event;
   event.type = eventLoop->eventUserTypeStep;
   event.user.type = eventLoop->eventUserTypeStep;
@@ -181,20 +187,25 @@ EventLoopSDL::run() {
         break;
       }
       case SDL_KEYDOWN: {
+#ifdef USE_SDL3
+        if (SDL_COMPAT_KEY(event) == SDLK_Q &&
+            (SDL_COMPAT_KEY_MOD(event) & KMOD_CTRL)) {
+#else
         if (SDL_COMPAT_KEY(event) == SDLK_q &&
-            (event.key.keysym.mod & KMOD_CTRL)) {
+            (SDL_COMPAT_KEY_MOD(event) & KMOD_CTRL)) {
+#endif
           quit();
           break;
         }
 
         unsigned char modifier = 0;
-        if (event.key.keysym.mod & KMOD_CTRL) {
+        if (SDL_COMPAT_KEY_MOD(event) & KMOD_CTRL) {
           modifier |= 1;
         }
-        if (event.key.keysym.mod & KMOD_SHIFT) {
+        if (SDL_COMPAT_KEY_MOD(event) & KMOD_SHIFT) {
           modifier |= 2;
         }
-        if (event.key.keysym.mod & KMOD_ALT) {
+        if (SDL_COMPAT_KEY_MOD(event) & KMOD_ALT) {
           modifier |= 4;
         }
 
@@ -228,8 +239,12 @@ EventLoopSDL::run() {
             break;
 
           // Video
+#ifdef USE_SDL3
+          case SDLK_F:
+#else
           case SDLK_f:
-            if (event.key.keysym.mod & KMOD_CTRL) {
+#endif
+            if (SDL_COMPAT_KEY_MOD(event) & KMOD_CTRL) {
               gfx.set_fullscreen(!gfx.is_fullscreen());
             } else {
                 // if this isn't handled the 'f' key
@@ -354,8 +369,13 @@ class TimerSDL : public Timer {
     }
   }
 
+#ifdef USE_SDL3
+  static Uint32 callback(void *userdata, SDL_TimerID timerID, Uint32 interval) {
+    TimerSDL *timer = reinterpret_cast<TimerSDL*>(userdata);
+#else
   static Uint32 callback(Uint32 interval, void *param) {
     TimerSDL *timer = reinterpret_cast<TimerSDL*>(param);
+#endif
     if (timer->handler != nullptr) {
       timer->handler->on_timer_fired(timer->id);
     }

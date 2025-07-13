@@ -50,10 +50,27 @@ VideoSDL::VideoSDL() {
   }
 
   /* Initialize defaults and Video subsystem */
+#ifdef USE_SDL3
+  if (SDL_CHECK_ERROR(SDL_InitSubSystem(SDL_INIT_VIDEO))) {
+    throw ExceptionSDL("Unable to initialize SDL video");
+  }
+#else
   if (SDL_CHECK_ERROR(SDL_VideoInit(NULL))) {
     throw ExceptionSDL("Unable to initialize SDL video");
   }
+#endif
 
+#ifdef USE_SDL3
+  int version = SDL_GetVersion();
+  int major = SDL_VERSIONNUM_MAJOR(version);
+  int minor = SDL_VERSIONNUM_MINOR(version);
+  int patch = SDL_VERSIONNUM_MICRO(version);
+  Log::Info["video"] << "Initialized with SDL "
+                     << major << '.'
+                     << minor << '.'
+                     << patch
+                     << " (driver: " << SDL_GetCurrentVideoDriver() << ")";
+#else
   SDL_version version;
   SDL_GetVersion(&version);
   Log::Info["video"] << "Initialized with SDL "
@@ -61,13 +78,20 @@ VideoSDL::VideoSDL() {
                      << static_cast<int>(version.minor) << '.'
                      << static_cast<int>(version.patch)
                      << " (driver: " << SDL_GetCurrentVideoDriver() << ")";
+#endif
 
   /* Create window and renderer */
+#ifdef USE_SDL3
+  window = SDL_CreateWindow("freeserf",
+                            800, 600,
+                            SDL_WINDOW_RESIZABLE);
+#else
   window = SDL_CreateWindow("freeserf",
                             SDL_WINDOWPOS_UNDEFINED,
                             SDL_WINDOWPOS_UNDEFINED,
                             800, 600,
                             SDL_WINDOW_RESIZABLE);
+#endif
   if (window == NULL) {
     throw ExceptionSDL("Unable to create SDL window");
   }
@@ -80,6 +104,15 @@ VideoSDL::VideoSDL() {
   }
 
   /* Determine optimal pixel format for current window */
+#ifdef USE_SDL3
+  // In SDL3, use a standard 32-bit RGBA format
+  pixel_format = SDL_PIXELFORMAT_RGBA8888;
+  
+  /* Initialize color component masks for screen surface */
+  int bpp;
+  SDL_GetMasksForPixelFormat((SDL_PixelFormat)pixel_format, &bpp,
+                             &Rmask, &Gmask, &Bmask, &Amask);
+#else
   SDL_RendererInfo render_info = {0, 0, 0, {0}, 0, 0};
   SDL_GetRendererInfo(renderer, &render_info);
   for (Uint32 i = 0; i < render_info.num_texture_formats; i++) {
@@ -92,9 +125,15 @@ VideoSDL::VideoSDL() {
   }
   SDL_PixelFormatEnumToMasks(pixel_format, &bpp,
                              &Rmask, &Gmask, &Bmask, &Amask);
+#endif
 
   /* Set scaling mode */
+#ifdef USE_SDL3
+  // SDL3 uses different hint name or per-texture settings
+  SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "linear");
+#else
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+#endif
 
   int w = 0;
   int h = 0;
@@ -232,7 +271,11 @@ VideoSDL::create_surface_from_data(void *data, int width, int height) {
   }
 
   /* Covert to screen format */
+#ifdef USE_SDL3
+  SDL_Surface *surf_screen = SDL_ConvertSurface(surf, (SDL_PixelFormat)pixel_format);
+#else
   SDL_Surface *surf_screen = SDL_ConvertSurfaceFormat(surf, pixel_format, 0);
+#endif
   if (surf_screen == nullptr) {
     throw ExceptionSDL("Unable to convert sprite surface");
   }
@@ -292,8 +335,13 @@ VideoSDL::draw_image(const Video::Image *image, int x, int y, int y_offset,
   /* Blit sprite */
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+#ifdef USE_SDL3
+  bool r = SDL_RenderCopy(renderer, image->texture, &src_rect, &dest_rect);
+  if (!r) {
+#else
   int r = SDL_RenderCopy(renderer, image->texture, &src_rect, &dest_rect);
   if (SDL_CHECK_ERROR(r)) {
+#endif
     throw ExceptionSDL("RenderCopy error");
   }
 }
@@ -306,8 +354,13 @@ VideoSDL::draw_frame(int dx, int dy, Video::Frame *dest, int sx, int sy,
 
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+#ifdef USE_SDL3
+  bool r = SDL_RenderCopy(renderer, src->texture, &src_rect, &dest_rect);
+  if (!r) {
+#else
   int r = SDL_RenderCopy(renderer, src->texture, &src_rect, &dest_rect);
   if (SDL_CHECK_ERROR(r)) {
+#endif
     throw ExceptionSDL("RenderCopy error");
   }
 }
@@ -330,8 +383,13 @@ VideoSDL::fill_rect(int x, int y, unsigned int width, unsigned int height,
   /* Fill rectangle */
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 0xff);
+#ifdef USE_SDL3
+  bool r = SDL_RenderFillRect(renderer, &rect);
+  if (!r) {
+#else
   int r = SDL_RenderFillRect(renderer, &rect);
   if (SDL_CHECK_ERROR(r)) {
+#endif
     throw ExceptionSDL("RenderFillRect error");
   }
 }
