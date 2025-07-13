@@ -49,7 +49,7 @@ AudioSDL::AudioSDL() {
     Log::Info["audio"] << "\t" << SDL_GetAudioDriver(i);
   }
 
-  if (SDL_CHECK_ERROR(SDL_AudioInit(NULL))) {
+  if (SDL_CHECK_ERROR(SDL_COMPAT_AUDIO_INIT(NULL))) {
     throw ExceptionSDLmixer("Could not init SDL audio");
   }
 
@@ -72,7 +72,7 @@ AudioSDL::AudioSDL() {
     throw ExceptionSDLmixer("Could not init SDL_mixer");
   }
 
-  r = Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 512);
+  r = SDL_COMPAT_MIX_OPEN_AUDIO(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 512);
   if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDLmixer("Could not open audio device");
   }
@@ -96,7 +96,7 @@ AudioSDL::~AudioSDL() {
 
   Mix_CloseAudio();
   Mix_Quit();
-  SDL_AudioQuit();
+  SDL_COMPAT_AUDIO_QUIT();
 }
 
 float
@@ -153,7 +153,7 @@ AudioSDL::PlayerSFX::create_track(int track_id) {
 
   SDL_RWops *rw = SDL_RWFromMem(wav->get_data(),
                                 static_cast<int>(wav->get_size()));
-  Mix_Chunk *chunk = Mix_LoadWAV_RW(rw, 0);
+  Mix_Chunk *chunk = SDL_LoadWAV_RW(rw, 0);
   if (chunk == nullptr) {
     Log::Error["audio:SDL_mixer"] << "Mix_LoadWAV_RW: " << Mix_GetError();
     return nullptr;

@@ -63,6 +63,14 @@
 #define SDL_LoadWAV_RW SDL_LoadWAV_IO
 #define SDL_RWFromMem SDL_IOFromMem
 
+// SDL3 audio initialization compatibility
+#define SDL_COMPAT_AUDIO_INIT(driver) SDL_InitSubSystem(SDL_INIT_AUDIO)
+#define SDL_COMPAT_AUDIO_QUIT() SDL_QuitSubSystem(SDL_INIT_AUDIO)
+
+// SDL3 Mix_OpenAudio compatibility wrapper
+#define SDL_COMPAT_MIX_OPEN_AUDIO(freq, format, channels, chunksize) \
+  Mix_OpenAudio(freq, format, channels, chunksize)
+
 // SDL3 window/renderer creation changes
 #define SDL_CreateRenderer(window, index, flags) SDL_CreateRenderer(window, NULL)
 
@@ -108,6 +116,14 @@
 // SDL2 uses int return values (0 for success, negative for error)
 #define SDL_CHECK_SUCCESS(call) ((call) == 0)
 #define SDL_CHECK_ERROR(call) ((call) < 0)
+
+// SDL2 audio initialization compatibility  
+#define SDL_COMPAT_AUDIO_INIT(driver) SDL_AudioInit(driver)
+#define SDL_COMPAT_AUDIO_QUIT() SDL_AudioQuit()
+
+// SDL2 Mix_OpenAudio compatibility wrapper
+#define SDL_COMPAT_MIX_OPEN_AUDIO(freq, format, channels, chunksize) \
+  Mix_OpenAudio(freq, format, channels, chunksize)
 
 // SDL2 event structure compatibility
 #define SDL_COMPAT_KEY(event) ((event).key.keysym.sym)
