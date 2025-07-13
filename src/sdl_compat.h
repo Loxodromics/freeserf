@@ -68,6 +68,13 @@
 
 // SDL3 rendering function renames
 #define SDL_GetRendererOutputSize SDL_GetCurrentRenderOutputSize
+#define SDL_RenderSetLogicalSize SDL_SetRenderLogicalPresentation_Compat
+
+// SDL3 texture filtering compatibility
+#define SDL_COMPAT_SET_TEXTURE_FILTERING(texture) SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST)
+
+// SDL3 renderer flushing (required before direct graphics API calls)
+#define SDL_COMPAT_FLUSH_RENDERER(renderer) SDL_FlushRenderer(renderer)
 
 // SDL3 mouse coordinate changes (now float)
 #define SDL_COMPAT_MOUSE_X(event) ((int)(event).button.x)
@@ -96,6 +103,11 @@
 #define SDL_COMPAT_MOUSE_X(event) ((event).button.x)
 #define SDL_COMPAT_MOUSE_Y(event) ((event).button.y)
 
+// SDL2 compatibility for new SDL3 functions
+#define SDL_RenderSetLogicalSize SDL_RenderSetLogicalSize
+#define SDL_COMPAT_SET_TEXTURE_FILTERING(texture) ((void)0)
+#define SDL_COMPAT_FLUSH_RENDERER(renderer) ((void)0)
+
 // SDL2 function names are unchanged
 // (macros already defined to themselves above)
 
@@ -105,5 +117,14 @@
 #define SDL_LOG_ERROR(msg) SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, msg)
 #define SDL_LOG_WARN(msg) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, msg)
 #define SDL_LOG_INFO(msg) SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, msg)
+
+// SDL3 compatibility function for logical presentation
+#ifdef USE_SDL3
+inline int SDL_SetRenderLogicalPresentation_Compat(SDL_Renderer* renderer, int w, int h) {
+  return SDL_SetRenderLogicalPresentation(renderer, w, h, 
+                                          SDL_LOGICAL_PRESENTATION_LETTERBOX, 
+                                          SDL_SCALEMODE_LINEAR) ? 0 : -1;
+}
+#endif
 
 #endif  // SRC_SDL_COMPAT_H_

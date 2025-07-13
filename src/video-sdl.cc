@@ -257,6 +257,9 @@ VideoSDL::create_texture(int width, int height) {
   SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
   SDL_RenderClear(renderer);
 
+  /* Set nearest neighbor filtering for pixel art */
+  SDL_COMPAT_SET_TEXTURE_FILTERING(texture);
+
   return texture;
 }
 
@@ -269,6 +272,9 @@ VideoSDL::create_texture_from_data(void *data, int width, int height) {
   }
 
   SDL_FreeSurface(surf);
+
+  /* Set nearest neighbor filtering for pixel art */
+  SDL_COMPAT_SET_TEXTURE_FILTERING(texture);
 
   return texture;
 }
@@ -342,6 +348,10 @@ void
 VideoSDL::swap_buffers() {
   SDL_SetRenderTarget(renderer, nullptr);
   SDL_RenderCopy(renderer, screen->texture, nullptr, nullptr);
+  
+  /* Flush renderer before presenting (required for SDL3 batching) */
+  SDL_COMPAT_FLUSH_RENDERER(renderer);
+  
   SDL_RenderPresent(renderer);
 }
 
