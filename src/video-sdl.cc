@@ -110,8 +110,10 @@ VideoSDL::VideoSDL() {
   
   /* Initialize color component masks for screen surface */
   int bpp;
-  SDL_GetMasksForPixelFormat((SDL_PixelFormat)pixel_format, &bpp,
-                             &Rmask, &Gmask, &Bmask, &Amask);
+  if (!SDL_GetMasksForPixelFormat((SDL_PixelFormat)pixel_format, &bpp,
+                                  &Rmask, &Gmask, &Bmask, &Amask)) {
+    throw ExceptionSDL("SDL_GetMasksForPixelFormat failed");
+  }
 #else
   SDL_RendererInfo render_info = {0, 0, 0, {0}, 0, 0};
   SDL_GetRendererInfo(renderer, &render_info);
@@ -137,7 +139,7 @@ VideoSDL::VideoSDL() {
 
   int w = 0;
   int h = 0;
-  SDL_GL_GetDrawableSize(window, &w, &h);
+  SDL_GetWindowSize(window, &w, &h);
   set_resolution(w, h, fullscreen);
 }
 
@@ -189,7 +191,7 @@ VideoSDL::set_resolution(unsigned int width, unsigned int height, bool fs) {
   /* Set logical size of screen */
   r = SDL_RenderSetLogicalSize(renderer, width, height);
   if (SDL_CHECK_ERROR(r)) {
-    throw ExceptionSDL("Unable to set logical size");
+    Log::Info["video"] << "Logical presentation not supported, continuing without it";
   }
 
   fullscreen = fs;

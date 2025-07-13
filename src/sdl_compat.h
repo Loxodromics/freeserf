@@ -287,8 +287,18 @@ bool SDL_RenderFillRect_Compat(SDL_Renderer *renderer, const SDL_Rect *rect);
 // SDL3 compatibility functions for surface creation and pixel formats
 #ifdef USE_SDL3
 inline int SDL_SetRenderLogicalPresentation_Compat(SDL_Renderer* renderer, int w, int h) {
-  return SDL_SetRenderLogicalPresentation(renderer, w, h, 
-                                          SDL_LOGICAL_PRESENTATION_LETTERBOX) ? 0 : -1;
+  // SDL3 function signature: SDL_SetRenderLogicalPresentation(renderer, w, h, mode)
+  if (SDL_SetRenderLogicalPresentation(renderer, w, h, 
+                                       SDL_LOGICAL_PRESENTATION_LETTERBOX)) {
+    return 0;
+  } else {
+    // If letterbox fails, try stretch mode instead
+    if (SDL_SetRenderLogicalPresentation(renderer, w, h, 
+                                         SDL_LOGICAL_PRESENTATION_STRETCH)) {
+      return 0;
+    }
+    return -1;
+  }
 }
 
 inline SDL_Surface* SDL_CreateSurface_Compat(Uint32 flags, int width, int height, int depth,
