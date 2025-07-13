@@ -32,9 +32,10 @@
 #include "src/interface.h"
 #include "src/game-manager.h"
 #include "src/command_line.h"
+#include "src/video-sdl.h"
 
 #ifdef WIN32
-# include <SDL.h>
+# include "src/sdl_compat.h"
 #endif  // WIN32
 
 int
@@ -86,6 +87,7 @@ main(int argc, char *argv[]) {
   }
 
   Log::Info["main"] << "freeserf " << FREESERF_VERSION;
+
 
   Data &data = Data::get_instance();
   if (!data.load(data_dir)) {

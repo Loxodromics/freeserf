@@ -25,8 +25,7 @@
 #include <exception>
 #include <string>
 
-#include <SDL.h>
-
+#include "src/sdl_compat.h"
 #include "src/video.h"
 
 class Video::Frame {
@@ -116,6 +115,9 @@ class VideoSDL : public Video {
   SDL_Surface *create_surface_from_data(void *data, int width, int height);
   SDL_Texture *create_texture(int width, int height);
   SDL_Texture *create_texture_from_data(void *data, int width, int height);
+  
+  void apply_color_channel_fix(SDL_Surface *surf);
 };
+
 
 #endif  // SRC_VIDEO_SDL_H_

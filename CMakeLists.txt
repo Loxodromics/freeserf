@@ -11,6 +11,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(GitTools)
+include(FetchSDL)
 git_make_version(FREESERF_VERSION ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_VERSION})
 message(STATUS "FREESERF_VERSION = ${FREESERF_VERSION}")
 
@@ -27,6 +28,12 @@ add_definitions(-DPACKAGE_BUGREPORT="https://github.com/freeserf/freeserf/issues
 
 include(CppLint)
 enable_check_style()
+
+# Set up SDL3 optional dependencies (mixer/image) from source
+setup_sdl3_optional_dependencies()
+
+# Find packages provided by Conan
+find_package(GTest REQUIRED)
 
 add_subdirectory(src)
 

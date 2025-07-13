@@ -1,14 +1,28 @@
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
-option(ENABLE_SDL2_MIXER "Enable audio support using SDL2_mixer" ON)
-option(ENABLE_SDL2_IMAGE "Enable image loading using SDL2_image" ON)
+option(USE_SDL3 "Use SDL3 instead of SDL2" ON)
+option(ENABLE_SDL_MIXER "Enable audio support using SDL_mixer" ON)  # Re-enabled for SDL3 via FetchContent
+option(ENABLE_SDL_IMAGE "Enable image loading using SDL_image" OFF)  # Temporarily disabled for SDL3
 
-find_package(SDL2 REQUIRED)
-if(ENABLE_SDL2_MIXER)
-  find_package(SDL2_mixer REQUIRED)
-endif()
-if(ENABLE_SDL2_IMAGE)
-  find_package(SDL2_image REQUIRED)
+if(USE_SDL3)
+  add_definitions(-DUSE_SDL3)
+  add_definitions(-DSDL_NO_COMPAT=1)  # Disable SDL3's compatibility layer
+  if(ENABLE_SDL_MIXER)
+    add_definitions(-DENABLE_SDL_MIXER)
+  endif()
+  if(ENABLE_SDL_IMAGE)
+    add_definitions(-DENABLE_SDL_IMAGE)
+  endif()
+  # SDL3, SDL3_mixer and SDL3_image are built from source via FetchContent
+  # Their targets are created by the FetchSDL module
+else()
+  find_package(SDL2 REQUIRED)
+  if(ENABLE_SDL_MIXER)
+    find_package(SDL2_mixer REQUIRED)
+  endif()
+  if(ENABLE_SDL_IMAGE)
+    find_package(SDL2_image REQUIRED)
+  endif()
 endif()
 
 if(WIN32)
@@ -69,7 +83,8 @@ target_check_style(game)
 
 set(PLATFORM_SOURCES video.cc
                      audio.cc
-                     event_loop.cc)
+                     event_loop.cc
+                     sdl_compat.cc)
 
 set(PLATFORM_HEADERS video.h
                      audio.h
@@ -78,7 +93,7 @@ set(PLATFORM_HEADERS video.h
 list(APPEND PLATFORM_SOURCES video-sdl.cc event_loop-sdl.cc)
 list(APPEND PLATFORM_HEADERS video-sdl.h event_loop-sdl.h)
 
-if(ENABLE_SDL2_MIXER)
+if(ENABLE_SDL_MIXER)
   list(APPEND PLATFORM_SOURCES audio-sdlmixer.cc)
   list(APPEND PLATFORM_HEADERS audio-sdlmixer.h)
 else()
@@ -87,9 +102,24 @@ else()
 endif()
 
 add_library(platform STATIC ${PLATFORM_SOURCES} ${PLATFORM_HEADERS})
-target_link_libraries(platform SDL2::SDL2)
-if(ENABLE_SDL2_MIXER)
-  target_link_libraries(platform SDL2_mixer::SDL2_mixer)
+if(USE_SDL3)
+  # Check which SDL3 target is available (Conan vs system/find_package)
+  if(TARGET SDL3::SDL3)
+    target_link_libraries(platform SDL3::SDL3)
+  elseif(TARGET sdl::sdl)
+    target_link_libraries(platform sdl::sdl)
+  else()
+    message(FATAL_ERROR "No SDL3 target found. Expected SDL3::SDL3 or sdl::sdl")
+  endif()
+  
+  if(ENABLE_SDL_MIXER AND TARGET SDL3_mixer::SDL3_mixer)
+    target_link_libraries(platform SDL3_mixer::SDL3_mixer)
+  endif()
+else()
+  target_link_libraries(platform SDL2::SDL2)
+  if(ENABLE_SDL_MIXER)
+    target_link_libraries(platform SDL2_mixer::SDL2_mixer)
+  endif()
 endif()
 target_check_style(platform)
 
@@ -118,15 +148,22 @@ set(DATA_HEADERS data.h
                  data-source.h
                  sprite-file.h)
 
-if(ENABLE_SDL2_IMAGE)
+if(ENABLE_SDL_IMAGE)
   list(APPEND DATA_SOURCES sprite-file-sdl.cc)
 else()
   list(APPEND DATA_SOURCES sprite-file-dummy.cc)
 endif()
 
 add_library(data STATIC ${DATA_SOURCES} ${DATA_HEADERS})
-if(ENABLE_SDL2_IMAGE)
-  target_link_libraries(data SDL2::SDL2 SDL2_image::SDL2_image)
+if(ENABLE_SDL_IMAGE)
+  if(USE_SDL3)
+    target_link_libraries(data SDL3::SDL3)
+    if(TARGET SDL3_image::SDL3_image)
+      target_link_libraries(data SDL3_image::SDL3_image)
+    endif()
+  else()
+    target_link_libraries(data SDL2::SDL2 SDL2_image::SDL2_image)
+  endif()
 endif()
 target_check_style(data)
 
@@ -171,15 +208,33 @@ add_executable(FreeSerf MACOSX_BUNDLE WIN32 ${FREESERF_SOURCES} ${FREESERF_HEADE
 target_check_style(FreeSerf)
 
 target_link_libraries(FreeSerf game platform data tools)
-target_link_libraries(FreeSerf SDL2::SDL2)
-if(WIN32)
-  target_link_libraries(FreeSerf SDL2::SDL2main)
-endif()
-if(ENABLE_SDL2_MIXER)
-  target_link_libraries(FreeSerf SDL2_mixer::SDL2_mixer)
-endif()
-if(ENABLE_SDL2_IMAGE)
-  target_link_libraries(FreeSerf SDL2_image::SDL2_image)
+if(USE_SDL3)
+  # Check which SDL3 target is available (Conan vs system/find_package)
+  if(TARGET SDL3::SDL3)
+    target_link_libraries(FreeSerf SDL3::SDL3)
+  elseif(TARGET sdl::sdl)
+    target_link_libraries(FreeSerf sdl::sdl)
+  else()
+    message(FATAL_ERROR "No SDL3 target found. Expected SDL3::SDL3 or sdl::sdl")
+  endif()
+  
+  if(ENABLE_SDL_MIXER AND TARGET SDL3_mixer::SDL3_mixer)
+    target_link_libraries(FreeSerf SDL3_mixer::SDL3_mixer)
+  endif()
+  if(ENABLE_SDL_IMAGE AND TARGET SDL3_image::SDL3_image)
+    target_link_libraries(FreeSerf SDL3_image::SDL3_image)
+  endif()
+else()
+  target_link_libraries(FreeSerf SDL2::SDL2)
+  if(WIN32)
+    target_link_libraries(FreeSerf SDL2::SDL2main)
+  endif()
+  if(ENABLE_SDL_MIXER)
+    target_link_libraries(FreeSerf SDL2_mixer::SDL2_mixer)
+  endif()
+  if(ENABLE_SDL_IMAGE)
+    target_link_libraries(FreeSerf SDL2_image::SDL2_image)
+  endif()
 endif()
 install(TARGETS FreeSerf DESTINATION ".")
 

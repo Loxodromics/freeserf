@@ -27,8 +27,7 @@
 
 #include <string>
 
-#include <SDL_mixer.h>
-
+#include "src/sdl_compat.h"
 #include "src/event_loop.h"
 #include "src/buffer.h"
 

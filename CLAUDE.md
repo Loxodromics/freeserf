@@ -40,13 +40,55 @@ ninja test
 ninja check_style
 ```
 
+### SDL3 Build (default)
+```bash
+# Traditional Build with SDL3 (default)
+mkdir build && cd build
+cmake -G Ninja -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON ..
+ninja
+
+# Conan 2 Build with SDL3 (recommended)
+mkdir build
+conan install . --output-folder=build --build=missing
+cd build
+cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON
+ninja
+
+# Run tests
+ninja test
+
+# Check code style
+ninja check_style
+```
+
+### SDL2 Build (legacy)
+```bash
+# Traditional Build with SDL2
+mkdir build && cd build
+cmake -G Ninja -DUSE_SDL3=OFF ..
+ninja
+
+# Conan 2 Build with SDL2 (when needed)
+mkdir build
+conan install . --output-folder=build --build=missing -o use_sdl3=False
+cd build
+cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=OFF
+ninja
+
+# Run tests
+ninja test
+
+# Check code style
+ninja check_style
+```
+
 ## Code Architecture
 
 ### Core Libraries
 
 - **tools**: Utility functions (debug, log, configfile, buffer)
 - **game**: Core game logic (buildings, flags, serfs, map, players, AI)
-- **platform**: Platform abstraction (video, audio, event handling via SDL2)
+- **platform**: Platform abstraction (video, audio, event handling via SDL2/SDL3)
 - **data**: Resource management (DOS/Amiga data files, sprites, audio conversion)
 
 ### Main Components
@@ -67,18 +109,24 @@ ninja check_style
 ## Dependencies
 
 ### Traditional Build
-- SDL2 (required)
-- SDL2_mixer (optional, for audio)
-- SDL2_image (optional, for custom resources)
+- SDL3 (default) or SDL2 (legacy support)
+- SDL3_mixer/SDL2_mixer (SDL3_mixer built from source via FetchContent, optional for audio)
+- SDL3_image/SDL2_image (temporarily disabled for SDL3, optional for custom resources)
 - GoogleTest (automatically downloaded for tests)
 
 ### Conan 2 Build
 - Conan 2.0+ package manager
-- All dependencies managed through `conanfile.py`:
-  - sdl/2.28.3
-  - sdl_mixer/2.8.0 (optional)
-  - sdl_image/2.8.2 (optional)
+- Hybrid dependency approach:
+  - SDL3: sdl/3.2.14 from Conan (default)
+  - SDL3_mixer: Built from source via FetchContent (not available in Conan yet)
+  - SDL2: sdl/2.28.3, sdl_mixer/2.8.0, sdl_image/2.8.2 (legacy)
   - gtest/1.14.0 (for tests)
+
+### SDL3 Migration Status
+- **Core SDL3**: ✅ Complete - Video, events, rendering, timers
+- **SDL3_mixer**: ✅ Complete - Audio fully working via FetchContent build
+- **SDL3_image**: ⏳ Temporarily disabled - Will be re-enabled when stable packages available
+- **Compatibility Layer**: ✅ Complete - `src/sdl_compat.h` provides SDL2/SDL3 abstraction with full audio support
 
 ## Testing
 

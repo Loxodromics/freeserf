@@ -21,8 +21,6 @@
 
 #include "src/event_loop-sdl.h"
 
-#include <SDL.h>
-
 #include "src/log.h"
 #include "src/gfx.h"
 #include "src/freeserf.h"
@@ -45,7 +43,9 @@ EventLoopSDL::EventLoopSDL()
   : zoom_factor(1.f)
   , screen_factor_x(1.f)
   , screen_factor_y(1.f) {
-  SDL_InitSubSystem(SDL_INIT_EVENTS | SDL_INIT_TIMER);
+  if (SDL_CHECK_ERROR(SDL_InitSubSystem(SDL_INIT_EVENTS | SDL_INIT_TIMER))) {
+    throw ExceptionFreeserf("Failed to initialize SDL subsystems");
+  }
 
   eventUserTypeStep = SDL_RegisterEvents(2);
   if (eventUserTypeStep == (Uint32)-1) {
@@ -54,9 +54,16 @@ EventLoopSDL::EventLoopSDL()
   eventUserTypeStep++;
 }
 
+#ifdef USE_SDL3
+Uint32
+EventLoopSDL::timer_callback(void *userdata, SDL_TimerID timerID,
+                             Uint32 interval) {
+  EventLoopSDL *eventLoop = static_cast<EventLoopSDL*>(userdata);
+#else
 Uint32
 EventLoopSDL::timer_callback(Uint32 interval, void *param) {
   EventLoopSDL *eventLoop = static_cast<EventLoopSDL*>(param);
+#endif
   SDL_Event event;
   event.type = eventLoop->eventUserTypeStep;
   event.user.type = eventLoop->eventUserTypeStep;
@@ -123,24 +130,30 @@ EventLoopSDL::run() {
         }
 
         if (event.button.button <= 3) {
-          int x = static_cast<int>(static_cast<float>(event.button.x) *
-                                   zoom_factor * screen_factor_x);
-          int y = static_cast<int>(static_cast<float>(event.button.y) *
-                                   zoom_factor * screen_factor_y);
+          int x = static_cast<int>(
+              static_cast<float>(SDL_COMPAT_MOUSE_X(event)) *
+              zoom_factor * screen_factor_x);
+          int y = static_cast<int>(
+              static_cast<float>(SDL_COMPAT_MOUSE_Y(event)) *
+              zoom_factor * screen_factor_y);
           notify_click(x, y, (Event::Button)event.button.button);
 
           if (current_ticks - last_click[event.button.button] <
                 MOUSE_TIME_SENSITIVITY &&
-              event.button.x >= (last_click_x - MOUSE_MOVE_SENSITIVITY) &&
-              event.button.x <= (last_click_x + MOUSE_MOVE_SENSITIVITY) &&
-              event.button.y >= (last_click_y - MOUSE_MOVE_SENSITIVITY) &&
-              event.button.y <= (last_click_y + MOUSE_MOVE_SENSITIVITY)) {
+              SDL_COMPAT_MOUSE_X(event) >=
+                  (last_click_x - MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_X(event) <=
+                  (last_click_x + MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_Y(event) >=
+                  (last_click_y - MOUSE_MOVE_SENSITIVITY) &&
+              SDL_COMPAT_MOUSE_Y(event) <=
+                  (last_click_y + MOUSE_MOVE_SENSITIVITY)) {
             notify_dbl_click(x, y, (Event::Button)event.button.button);
           }
 
           last_click[event.button.button] = current_ticks;
-          last_click_x = event.button.x;
-          last_click_y = event.button.y;
+          last_click_x = SDL_COMPAT_MOUSE_X(event);
+          last_click_y = SDL_COMPAT_MOUSE_Y(event);
         }
         break;
       case SDL_MOUSEBUTTONDOWN:
@@ -181,24 +194,29 @@ EventLoopSDL::run() {
         break;
       }
       case SDL_KEYDOWN: {
-        if (event.key.keysym.sym == SDLK_q &&
-            (event.key.keysym.mod & KMOD_CTRL)) {
+#ifdef USE_SDL3
+        if (SDL_COMPAT_KEY(event) == SDLK_Q &&
+            (SDL_COMPAT_KEY_MOD(event) & KMOD_CTRL)) {
+#else
+        if (SDL_COMPAT_KEY(event) == SDLK_q &&
+            (SDL_COMPAT_KEY_MOD(event) & KMOD_CTRL)) {
+#endif
           quit();
           break;
         }
 
         unsigned char modifier = 0;
-        if (event.key.keysym.mod & KMOD_CTRL) {
+        if (SDL_COMPAT_KEY_MOD(event) & KMOD_CTRL) {
           modifier |= 1;
         }
-        if (event.key.keysym.mod & KMOD_SHIFT) {
+        if (SDL_COMPAT_KEY_MOD(event) & KMOD_SHIFT) {
           modifier |= 2;
         }
-        if (event.key.keysym.mod & KMOD_ALT) {
+        if (SDL_COMPAT_KEY_MOD(event) & KMOD_ALT) {
           modifier |= 4;
         }
 
-        switch (event.key.keysym.sym) {
+        switch (SDL_COMPAT_KEY(event)) {
           // Map scroll
           case SDLK_UP: {
             notify_drag(0, 0, 0, -32, Event::ButtonLeft);
@@ -228,13 +246,17 @@ EventLoopSDL::run() {
             break;
 
           // Video
+#ifdef USE_SDL3
+          case SDLK_F:
+#else
           case SDLK_f:
-            if (event.key.keysym.mod & KMOD_CTRL) {
+#endif
+            if (SDL_COMPAT_KEY_MOD(event) & KMOD_CTRL) {
               gfx.set_fullscreen(!gfx.is_fullscreen());
             } else {
                 // if this isn't handled the 'f' key
                 // doesn't work for savegame names
-                notify_key_pressed(event.key.keysym.sym, modifier);
+                notify_key_pressed(SDL_COMPAT_KEY(event), modifier);
             }
             break;
           case SDLK_RIGHTBRACKET:
@@ -250,7 +272,7 @@ EventLoopSDL::run() {
             break;
 
           default:
-            notify_key_pressed(event.key.keysym.sym, modifier);
+            notify_key_pressed(SDL_COMPAT_KEY(event), modifier);
             break;
         }
 
@@ -260,9 +282,10 @@ EventLoopSDL::run() {
         notify_key_pressed('c', 1);
         break;
       case SDL_WINDOWEVENT:
-        if (SDL_WINDOWEVENT_SIZE_CHANGED == event.window.event) {
-          unsigned int width = event.window.data1;
-          unsigned int height = event.window.data2;
+        if (SDL_WINDOWEVENT_SIZE_CHANGED ==
+            SDL_COMPAT_WINDOW_EVENT_TYPE(event)) {
+          unsigned int width = SDL_COMPAT_WINDOW_DATA1(event);
+          unsigned int height = SDL_COMPAT_WINDOW_DATA2(event);
           gfx.set_resolution(width, height, gfx.is_fullscreen());
           gfx.get_screen_factor(&screen_factor_x, &screen_factor_y);
           float factor = (gfx.get_zoom_factor() - 1);
@@ -354,8 +377,13 @@ class TimerSDL : public Timer {
     }
   }
 
+#ifdef USE_SDL3
+  static Uint32 callback(void *userdata, SDL_TimerID timerID, Uint32 interval) {
+    TimerSDL *timer = reinterpret_cast<TimerSDL*>(userdata);
+#else
   static Uint32 callback(Uint32 interval, void *param) {
     TimerSDL *timer = reinterpret_cast<TimerSDL*>(param);
+#endif
     if (timer->handler != nullptr) {
       timer->handler->on_timer_fired(timer->id);
     }

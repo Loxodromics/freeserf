@@ -21,7 +21,8 @@
 
 #include "src/sprite-file.h"
 
-#include <SDL_image.h>
+#include "src/sdl_compat.h"
+#include "src/log.h"
 
 SpriteFile::SpriteFile() {
   IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG | IMG_INIT_TIF);
@@ -33,11 +34,19 @@ SpriteFile::load(const std::string &path) {
   if (image == nullptr) {
     return false;
   }
+  
+  // Use consistent RGBA8888 pixel format for both SDL2 and SDL3
   SDL_Surface *surf = SDL_ConvertSurfaceFormat(image,
-                                               SDL_PIXELFORMAT_ARGB8888,
+                                               SDL_PIXELFORMAT_RGBA8888,
                                                0);
   SDL_FreeSurface(image);
+  
+  if (surf == nullptr) {
+    return false;
+  }
+  
   SDL_LockSurface(surf);
+  
   width = surf->w;
   height = surf->h;
   size_t size = width * height * 4;

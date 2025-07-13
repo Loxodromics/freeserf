@@ -23,8 +23,6 @@
 
 #include <sstream>
 
-#include <SDL.h>
-
 ExceptionSDL::ExceptionSDL(const std::string &description) throw()
   : ExceptionVideo(description) {
   sdl_error = SDL_GetError();
@@ -37,6 +35,7 @@ Uint32 VideoSDL::Gmask = 0x00FF0000;
 Uint32 VideoSDL::Bmask = 0xFF000000;
 Uint32 VideoSDL::Amask = 0x000000FF;
 Uint32 VideoSDL::pixel_format = SDL_PIXELFORMAT_RGBA8888;
+
 
 VideoSDL::VideoSDL() {
   screen = nullptr;
@@ -52,10 +51,27 @@ VideoSDL::VideoSDL() {
   }
 
   /* Initialize defaults and Video subsystem */
-  if (SDL_VideoInit(NULL) != 0) {
+#ifdef USE_SDL3
+  if (SDL_CHECK_ERROR(SDL_InitSubSystem(SDL_INIT_VIDEO))) {
     throw ExceptionSDL("Unable to initialize SDL video");
   }
+#else
+  if (SDL_CHECK_ERROR(SDL_VideoInit(NULL))) {
+    throw ExceptionSDL("Unable to initialize SDL video");
+  }
+#endif
 
+#ifdef USE_SDL3
+  int version = SDL_GetVersion();
+  int major = SDL_VERSIONNUM_MAJOR(version);
+  int minor = SDL_VERSIONNUM_MINOR(version);
+  int patch = SDL_VERSIONNUM_MICRO(version);
+  Log::Info["video"] << "Initialized with SDL "
+                     << major << '.'
+                     << minor << '.'
+                     << patch
+                     << " (driver: " << SDL_GetCurrentVideoDriver() << ")";
+#else
   SDL_version version;
   SDL_GetVersion(&version);
   Log::Info["video"] << "Initialized with SDL "
@@ -63,13 +79,20 @@ VideoSDL::VideoSDL() {
                      << static_cast<int>(version.minor) << '.'
                      << static_cast<int>(version.patch)
                      << " (driver: " << SDL_GetCurrentVideoDriver() << ")";
+#endif
 
   /* Create window and renderer */
+#ifdef USE_SDL3
+  window = SDL_CreateWindow("freeserf",
+                            800, 600,
+                            SDL_WINDOW_RESIZABLE);
+#else
   window = SDL_CreateWindow("freeserf",
                             SDL_WINDOWPOS_UNDEFINED,
                             SDL_WINDOWPOS_UNDEFINED,
                             800, 600,
                             SDL_WINDOW_RESIZABLE);
+#endif
   if (window == NULL) {
     throw ExceptionSDL("Unable to create SDL window");
   }
@@ -82,6 +105,16 @@ VideoSDL::VideoSDL() {
   }
 
   /* Determine optimal pixel format for current window */
+#ifdef USE_SDL3
+  // In SDL3, use a standard 32-bit RGBA format
+  pixel_format = SDL_PIXELFORMAT_RGBA8888;
+  /* Initialize color component masks for screen surface */
+  int bpp;
+  if (!SDL_GetMasksForPixelFormat((SDL_PixelFormat)pixel_format, &bpp,
+                                  &Rmask, &Gmask, &Bmask, &Amask)) {
+    throw ExceptionSDL("SDL_GetMasksForPixelFormat failed");
+  }
+#else
   SDL_RendererInfo render_info = {0, 0, 0, {0}, 0, 0};
   SDL_GetRendererInfo(renderer, &render_info);
   for (Uint32 i = 0; i < render_info.num_texture_formats; i++) {
@@ -94,13 +127,19 @@ VideoSDL::VideoSDL() {
   }
   SDL_PixelFormatEnumToMasks(pixel_format, &bpp,
                              &Rmask, &Gmask, &Bmask, &Amask);
+#endif
 
   /* Set scaling mode */
+#ifdef USE_SDL3
+  // SDL3 uses different hint name or per-texture settings
+  SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "linear");
+#else
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+#endif
 
   int w = 0;
   int h = 0;
-  SDL_GL_GetDrawableSize(window, &w, &h);
+  SDL_GetWindowSize(window, &w, &h);
   set_resolution(w, h, fullscreen);
 }
 
@@ -119,6 +158,7 @@ Video::get_instance() {
   return instance;
 }
 
+
 SDL_Surface *
 VideoSDL::create_surface(int width, int height) {
   SDL_Surface *surf = SDL_CreateRGBSurface(0, width, height, bpp,
@@ -135,7 +175,7 @@ VideoSDL::set_resolution(unsigned int width, unsigned int height, bool fs) {
   /* Set fullscreen mode */
   int r = SDL_SetWindowFullscreen(window,
                                   fs ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDL("Unable to set window fullscreen");
   }
 
@@ -151,8 +191,9 @@ VideoSDL::set_resolution(unsigned int width, unsigned int height, bool fs) {
 
   /* Set logical size of screen */
   r = SDL_RenderSetLogicalSize(renderer, width, height);
-  if (r < 0) {
-    throw ExceptionSDL("Unable to set logical size");
+  if (SDL_CHECK_ERROR(r)) {
+    Log::Info["video"] << "Logical presentation not supported, "
+                         << "continuing without it";
   }
 
   fullscreen = fs;
@@ -222,24 +263,67 @@ VideoSDL::warp_mouse(int x, int y) {
   SDL_WarpMouseInWindow(nullptr, x, y);
 }
 
+void
+VideoSDL::apply_color_channel_fix(SDL_Surface *surf) {
+  if (surf == nullptr || surf->pixels == nullptr) {
+    return;
+  }
+  
+  // Lock surface for pixel access
+#ifdef USE_SDL3
+  if (!SDL_LockSurface(surf)) {
+#else
+  if (SDL_LockSurface(surf) < 0) {
+#endif
+    return;
+  }
+  
+  uint32_t *pixels = (uint32_t *)surf->pixels;
+  int pixel_count = surf->w * surf->h;
+  
+  // Apply the correct color channel permutation for asset loading
+  // This fixes the color channel ordering issue found during SDL3 migration
+  for (int i = 0; i < pixel_count; i++) {
+    uint32_t pixel = pixels[i];
+    uint8_t r = (pixel & Rmask) >> (__builtin_ctz(Rmask));
+    uint8_t g = (pixel & Gmask) >> (__builtin_ctz(Gmask));
+    uint8_t b = (pixel & Bmask) >> (__builtin_ctz(Bmask));
+    uint8_t a = (pixel & Amask) >> (__builtin_ctz(Amask));
+    
+    // Apply the correct permutation: r->A, a->B, b->G, g->R
+    pixels[i] = (r << (__builtin_ctz(Amask))) | (a << (__builtin_ctz(Bmask))) |
+                (b << (__builtin_ctz(Gmask))) | (g << (__builtin_ctz(Rmask)));
+  }
+  
+  SDL_UnlockSurface(surf);
+}
+
 SDL_Surface *
 VideoSDL::create_surface_from_data(void *data, int width, int height) {
-  /* Create sprite surface */
+  /* Create sprite surface with dynamic masks matching pixel format */
   SDL_Surface *surf = SDL_CreateRGBSurfaceFrom(data, width, height, 32,
                                                4 * width,
-                                               0x00FF0000, 0x0000FF00,
-                                               0x000000FF, 0xFF000000);
+                                               Rmask, Gmask, Bmask, Amask);
   if (surf == nullptr) {
     throw ExceptionSDL("Unable to create sprite surface");
   }
+  
 
-  /* Covert to screen format */
+  /* Convert to screen format */
+#ifdef USE_SDL3
+  SDL_Surface *surf_screen = SDL_ConvertSurface(surf,
+                                                (SDL_PixelFormat)pixel_format);
+#else
   SDL_Surface *surf_screen = SDL_ConvertSurfaceFormat(surf, pixel_format, 0);
+#endif
   if (surf_screen == nullptr) {
     throw ExceptionSDL("Unable to convert sprite surface");
   }
 
   SDL_FreeSurface(surf);
+
+  // Apply color channel fix for SDL3 migration
+  apply_color_channel_fix(surf_screen);
 
   return surf_screen;
 }
@@ -259,6 +343,9 @@ VideoSDL::create_texture(int width, int height) {
   SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
   SDL_RenderClear(renderer);
 
+  /* Set nearest neighbor filtering for pixel art */
+  SDL_COMPAT_SET_TEXTURE_FILTERING(texture);
+
   return texture;
 }
 
@@ -271,6 +358,9 @@ VideoSDL::create_texture_from_data(void *data, int width, int height) {
   }
 
   SDL_FreeSurface(surf);
+
+  /* Set nearest neighbor filtering for pixel art */
+  SDL_COMPAT_SET_TEXTURE_FILTERING(texture);
 
   return texture;
 }
@@ -288,8 +378,13 @@ VideoSDL::draw_image(const Video::Image *image, int x, int y, int y_offset,
   /* Blit sprite */
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+#ifdef USE_SDL3
+  bool r = SDL_RenderCopy(renderer, image->texture, &src_rect, &dest_rect);
+  if (!r) {
+#else
   int r = SDL_RenderCopy(renderer, image->texture, &src_rect, &dest_rect);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
+#endif
     throw ExceptionSDL("RenderCopy error");
   }
 }
@@ -302,8 +397,13 @@ VideoSDL::draw_frame(int dx, int dy, Video::Frame *dest, int sx, int sy,
 
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+#ifdef USE_SDL3
+  bool r = SDL_RenderCopy(renderer, src->texture, &src_rect, &dest_rect);
+  if (!r) {
+#else
   int r = SDL_RenderCopy(renderer, src->texture, &src_rect, &dest_rect);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
+#endif
     throw ExceptionSDL("RenderCopy error");
   }
 }
@@ -326,8 +426,13 @@ VideoSDL::fill_rect(int x, int y, unsigned int width, unsigned int height,
   /* Fill rectangle */
   SDL_SetRenderTarget(renderer, dest->texture);
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 0xff);
+#ifdef USE_SDL3
+  bool r = SDL_RenderFillRect(renderer, &rect);
+  if (!r) {
+#else
   int r = SDL_RenderFillRect(renderer, &rect);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
+#endif
     throw ExceptionSDL("RenderFillRect error");
   }
 }
@@ -344,6 +449,8 @@ void
 VideoSDL::swap_buffers() {
   SDL_SetRenderTarget(renderer, nullptr);
   SDL_RenderCopy(renderer, screen->texture, nullptr, nullptr);
+  /* Flush renderer before presenting (required for SDL3 batching) */
+  SDL_COMPAT_FLUSH_RENDERER(renderer);
   SDL_RenderPresent(renderer);
 }
 

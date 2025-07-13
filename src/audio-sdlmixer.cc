@@ -25,9 +25,6 @@
 #include <memory>
 #include <string>
 
-#include <SDL.h>
-#include <SDL_mixer.h>
-
 #include "src/log.h"
 #include "src/data.h"
 
@@ -52,7 +49,7 @@ AudioSDL::AudioSDL() {
     Log::Info["audio"] << "\t" << SDL_GetAudioDriver(i);
   }
 
-  if (SDL_AudioInit(NULL) != 0) {
+  if (SDL_CHECK_ERROR(SDL_COMPAT_AUDIO_INIT(NULL))) {
     throw ExceptionSDLmixer("Could not init SDL audio");
   }
 
@@ -75,8 +72,8 @@ AudioSDL::AudioSDL() {
     throw ExceptionSDLmixer("Could not init SDL_mixer");
   }
 
-  r = Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 512);
-  if (r < 0) {
+  r = SDL_COMPAT_MIX_OPEN_AUDIO(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 512);
+  if (SDL_CHECK_ERROR(r)) {
     throw ExceptionSDLmixer("Could not open audio device");
   }
 
@@ -99,7 +96,7 @@ AudioSDL::~AudioSDL() {
 
   Mix_CloseAudio();
   Mix_Quit();
-  SDL_AudioQuit();
+  SDL_COMPAT_AUDIO_QUIT();
 }
 
 float
@@ -156,7 +153,7 @@ AudioSDL::PlayerSFX::create_track(int track_id) {
 
   SDL_RWops *rw = SDL_RWFromMem(wav->get_data(),
                                 static_cast<int>(wav->get_size()));
-  Mix_Chunk *chunk = Mix_LoadWAV_RW(rw, 0);
+  Mix_Chunk *chunk = SDL_LoadWAV_RW(rw, 0);
   if (chunk == nullptr) {
     Log::Error["audio:SDL_mixer"] << "Mix_LoadWAV_RW: " << Mix_GetError();
     return nullptr;
@@ -212,7 +209,7 @@ AudioSDL::TrackSFX::~TrackSFX() {
 void
 AudioSDL::TrackSFX::play() {
   int r = Mix_PlayChannel(-1, chunk, 0);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     Log::Error["audio:SDL_mixer"] << "Could not play SFX clip: "
                                   << Mix_GetError();
   }
@@ -349,7 +346,7 @@ AudioSDL::TrackMIDI::~TrackMIDI() {
 void
 AudioSDL::TrackMIDI::play() {
   int r = Mix_PlayMusic(chunk, 0);
-  if (r < 0) {
+  if (SDL_CHECK_ERROR(r)) {
     Log::Warn["audio:SDL_mixer"] << "Could not play MIDI track: "
                                  << Mix_GetError();
     PlayerMIDI::music_finished_hook();
