@@ -33,9 +33,16 @@ SpriteFile::load(const std::string &path) {
   if (image == nullptr) {
     return false;
   }
+  // Use consistent pixel format with video system
+#ifdef USE_SDL3
+  SDL_Surface *surf = SDL_ConvertSurfaceFormat(image,
+                                               SDL_PIXELFORMAT_RGBA8888,
+                                               0);
+#else
   SDL_Surface *surf = SDL_ConvertSurfaceFormat(image,
                                                SDL_PIXELFORMAT_ARGB8888,
                                                0);
+#endif
   SDL_FreeSurface(image);
   SDL_LockSurface(surf);
   width = surf->w;

@@ -32,6 +32,7 @@
 #include "src/interface.h"
 #include "src/game-manager.h"
 #include "src/command_line.h"
+#include "src/video-sdl.h"
 
 #ifdef WIN32
 # include "src/sdl_compat.h"
@@ -45,6 +46,8 @@ main(int argc, char *argv[]) {
   unsigned int screen_width = 0;
   unsigned int screen_height = 0;
   bool fullscreen = false;
+  bool debug_color_channels = false;
+  bool swap_rb_channels = false;
 
   CommandLine command_line;
   command_line.add_option('d', "Set Debug output level")
@@ -80,12 +83,26 @@ main(int argc, char *argv[]) {
                   s >> screen_height;
                   return true;
                 });
+  command_line.add_option('c', "Enable color channel debugging",
+                          [&debug_color_channels](){ debug_color_channels = true; });
+  command_line.add_option('s', "Swap R/B color channels for debugging",
+                          [&swap_rb_channels](){ swap_rb_channels = true; });
   command_line.set_comment("Please report bugs to <" PACKAGE_BUGREPORT ">");
   if (!command_line.process(argc, argv)) {
     return EXIT_FAILURE;
   }
 
   Log::Info["main"] << "freeserf " << FREESERF_VERSION;
+
+  // Enable color channel debugging if requested
+  if (debug_color_channels) {
+    Log::Info["main"] << "Color channel debugging enabled";
+    set_debug_color_channels(true);
+  }
+  if (swap_rb_channels) {
+    Log::Info["main"] << "R/B channel swapping enabled";
+    set_swap_rb_channels(true);
+  }
 
   Data &data = Data::get_instance();
   if (!data.load(data_dir)) {

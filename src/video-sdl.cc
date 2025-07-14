@@ -36,6 +36,10 @@ Uint32 VideoSDL::Bmask = 0xFF000000;
 Uint32 VideoSDL::Amask = 0x000000FF;
 Uint32 VideoSDL::pixel_format = SDL_PIXELFORMAT_RGBA8888;
 
+// Global debug flags for color channel debugging
+bool global_debug_color_channels = false;
+bool global_swap_rb_channels = false;
+
 VideoSDL::VideoSDL() {
   screen = nullptr;
   cursor = nullptr;
@@ -157,6 +161,16 @@ Video::get_instance() {
   return instance;
 }
 
+// Function to enable color channel debugging
+void set_debug_color_channels(bool enable) {
+  global_debug_color_channels = enable;
+}
+
+// Function to enable R/B channel swapping
+void set_swap_rb_channels(bool enable) {
+  global_swap_rb_channels = enable;
+}
+
 SDL_Surface *
 VideoSDL::create_surface(int width, int height) {
   SDL_Surface *surf = SDL_CreateRGBSurface(0, width, height, bpp,
@@ -261,18 +275,82 @@ VideoSDL::warp_mouse(int x, int y) {
   SDL_WarpMouseInWindow(nullptr, x, y);
 }
 
+#ifdef DEBUG
+void
+VideoSDL::debug_validate_and_swap_channels(SDL_Surface *surf) {
+  if (surf == nullptr || surf->pixels == nullptr) {
+    Log::Debug["video"] << "debug_validate_and_swap_channels: Invalid surface";
+    return;
+  }
+  
+  Log::Debug["video"] << "debug_validate_and_swap_channels: Processing surface "
+                      << surf->w << "x" << surf->h;
+  
+  // Lock surface for pixel access
+  if (SDL_LockSurface(surf) < 0) {
+    Log::Debug["video"] << "debug_validate_and_swap_channels: Could not lock surface";
+    return;
+  }
+  
+  uint32_t *pixels = (uint32_t *)surf->pixels;
+  int pixel_count = surf->w * surf->h;
+  
+  // Sample first few pixels to validate color channels
+  Log::Debug["video"] << "First 4 pixels (raw): ";
+  for (int i = 0; i < 4 && i < pixel_count; i++) {
+    uint32_t pixel = pixels[i];
+    uint8_t r = (pixel & Rmask) >> (__builtin_ctz(Rmask));
+    uint8_t g = (pixel & Gmask) >> (__builtin_ctz(Gmask));
+    uint8_t b = (pixel & Bmask) >> (__builtin_ctz(Bmask));
+    uint8_t a = (pixel & Amask) >> (__builtin_ctz(Amask));
+    Log::Debug["video"] << "  Pixel " << i << ": 0x" << std::hex << pixel << std::dec 
+                        << " R=" << (int)r << " G=" << (int)g << " B=" << (int)b << " A=" << (int)a;
+  }
+  
+  // Optional: Swap R and B channels as debugging test
+  // This helps identify if RGBA vs BGRA is the issue
+  if (global_swap_rb_channels) {
+    Log::Debug["video"] << "debug_validate_and_swap_channels: Swapping R and B channels";
+    
+    for (int i = 0; i < pixel_count; i++) {
+      uint32_t pixel = pixels[i];
+      uint8_t r = (pixel & Rmask) >> (__builtin_ctz(Rmask));
+      uint8_t g = (pixel & Gmask) >> (__builtin_ctz(Gmask));
+      uint8_t b = (pixel & Bmask) >> (__builtin_ctz(Bmask));
+      uint8_t a = (pixel & Amask) >> (__builtin_ctz(Amask));
+      
+      // Swap R and B channels
+      pixels[i] = (a << (__builtin_ctz(Amask))) | (b << (__builtin_ctz(Rmask))) | 
+                  (g << (__builtin_ctz(Gmask))) | (r << (__builtin_ctz(Bmask)));
+    }
+  }
+  
+  SDL_UnlockSurface(surf);
+}
+#endif
+
 SDL_Surface *
 VideoSDL::create_surface_from_data(void *data, int width, int height) {
-  /* Create sprite surface */
+  /* Create sprite surface with dynamic masks matching pixel format */
   SDL_Surface *surf = SDL_CreateRGBSurfaceFrom(data, width, height, 32,
                                                4 * width,
-                                               0x00FF0000, 0x0000FF00,
-                                               0x000000FF, 0xFF000000);
+                                               Rmask, Gmask, Bmask, Amask);
   if (surf == nullptr) {
     throw ExceptionSDL("Unable to create sprite surface");
   }
+  
+  // Debug: Log pixel format information for troubleshooting
+  #ifdef DEBUG
+  if (global_debug_color_channels) {
+    Log::Debug["video"] << "create_surface_from_data: Creating surface " << width << "x" << height;
+    Log::Debug["video"] << "  Pixel format: " << SDL_GetPixelFormatName(pixel_format);
+    Log::Debug["video"] << "  Masks - R: 0x" << std::hex << Rmask << " G: 0x" << Gmask 
+                        << " B: 0x" << Bmask << " A: 0x" << Amask << std::dec;
+    Log::Debug["video"] << "  Input surface format: " << SDL_GetPixelFormatName(surf->format->format);
+  }
+  #endif
 
-  /* Covert to screen format */
+  /* Convert to screen format */
 #ifdef USE_SDL3
   SDL_Surface *surf_screen = SDL_ConvertSurface(surf,
                                                 (SDL_PixelFormat)pixel_format);
@@ -284,6 +362,14 @@ VideoSDL::create_surface_from_data(void *data, int width, int height) {
   }
 
   SDL_FreeSurface(surf);
+
+  // Debug: Add color channel validation/swapping for troubleshooting
+  #ifdef DEBUG
+  if (global_debug_color_channels) {
+    Log::Debug["video"] << "  Converted surface format: " << SDL_GetPixelFormatName(surf_screen->format->format);
+    debug_validate_and_swap_channels(surf_screen);
+  }
+  #endif
 
   return surf_screen;
 }

@@ -115,6 +115,14 @@ class VideoSDL : public Video {
   SDL_Surface *create_surface_from_data(void *data, int width, int height);
   SDL_Texture *create_texture(int width, int height);
   SDL_Texture *create_texture_from_data(void *data, int width, int height);
+  
+#ifdef DEBUG
+  void debug_validate_and_swap_channels(SDL_Surface *surf);
+#endif
 };
+
+// Global functions to enable color channel debugging
+void set_debug_color_channels(bool enable);
+void set_swap_rb_channels(bool enable);
 
 #endif  // SRC_VIDEO_SDL_H_
