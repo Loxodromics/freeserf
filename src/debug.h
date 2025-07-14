@@ -29,6 +29,7 @@
 class ExceptionFreeserf : public std::exception {
  protected:
   std::string description;
+  mutable std::string full_description;
 
  public:
   explicit ExceptionFreeserf(const std::string &description) throw();
