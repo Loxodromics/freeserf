@@ -26,7 +26,7 @@ The color channel swapping occurs due to inconsistencies in the asset loading pi
 # Enable basic debug logging
 ./FreeSerf -d 1
 
-# Enable color channel debugging (requires DEBUG build)
+# Enable color channel debugging
 ./FreeSerf -d 1 -c
 
 # Enable color channel debugging with R/B channel swapping
@@ -35,6 +35,36 @@ The color channel swapping occurs due to inconsistencies in the asset loading pi
 # Most verbose logging with all color debugging features
 ./FreeSerf -d 0 -c -s
 ```
+
+### Color Channel Permutation Testing
+
+New command line options have been added to test different color channel orders:
+
+```bash
+# Test RGBA channel order (default)
+./FreeSerf -d 0 -c -1
+
+# Test BGRA channel order 
+./FreeSerf -d 0 -c -2
+
+# Test ARGB channel order
+./FreeSerf -d 0 -c -3
+
+# Test ABGR channel order
+./FreeSerf -d 0 -c -4
+```
+
+**Channel Permutation Options:**
+- `-1`: Force RGBA color channel order (default - no change)
+- `-2`: Force BGRA color channel order (Blue↔Red swap)
+- `-3`: Force ARGB color channel order (Alpha shifts to Red position)
+- `-4`: Force ABGR color channel order (Alpha and Blue swap positions)
+
+**Usage Notes:**
+- Only one permutation can be active at a time
+- Permutations work independently of the legacy `-s` (R/B swap) flag
+- Debug output shows which permutation is being applied
+- All permutations are processed at sprite/texture creation time
 
 ### Debug Level Options
 
