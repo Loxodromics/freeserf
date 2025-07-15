@@ -46,12 +46,6 @@ main(int argc, char *argv[]) {
   unsigned int screen_width = 0;
   unsigned int screen_height = 0;
   bool fullscreen = false;
-  bool debug_color_channels = false;
-  bool swap_rb_channels = false;
-  bool channel_rgba = false;
-  bool channel_bgra = false;
-  bool channel_argb = false;
-  bool channel_abgr = false;
 
   CommandLine command_line;
   command_line.add_option('d', "Set Debug output level")
@@ -87,18 +81,6 @@ main(int argc, char *argv[]) {
                   s >> screen_height;
                   return true;
                 });
-  command_line.add_option('c', "Enable color channel debugging",
-                          [&debug_color_channels](){ debug_color_channels = true; });
-  command_line.add_option('s', "Swap R/B color channels for debugging",
-                          [&swap_rb_channels](){ swap_rb_channels = true; });
-  command_line.add_option('1', "Force RGBA color channel order",
-                          [&channel_rgba](){ channel_rgba = true; });
-  command_line.add_option('2', "Force BGRA color channel order",
-                          [&channel_bgra](){ channel_bgra = true; });
-  command_line.add_option('3', "Force ARGB color channel order",
-                          [&channel_argb](){ channel_argb = true; });
-  command_line.add_option('4', "Force ABGR color channel order",
-                          [&channel_abgr](){ channel_abgr = true; });
   command_line.set_comment("Please report bugs to <" PACKAGE_BUGREPORT ">");
   if (!command_line.process(argc, argv)) {
     return EXIT_FAILURE;
@@ -106,33 +88,6 @@ main(int argc, char *argv[]) {
 
   Log::Info["main"] << "freeserf " << FREESERF_VERSION;
 
-  // Enable color channel debugging if requested
-  if (debug_color_channels) {
-    Log::Info["main"] << "Color channel debugging enabled";
-    set_debug_color_channels(true);
-  }
-  if (swap_rb_channels) {
-    Log::Info["main"] << "R/B channel swapping enabled";
-    set_swap_rb_channels(true);
-  }
-  
-  // Set color channel permutation if requested
-  if (channel_rgba) {
-    Log::Info["main"] << "Force RGBA color channel order";
-    set_channel_permutation_rgba();
-  }
-  if (channel_bgra) {
-    Log::Info["main"] << "Force BGRA color channel order";
-    set_channel_permutation_bgra();
-  }
-  if (channel_argb) {
-    Log::Info["main"] << "Force ARGB color channel order";
-    set_channel_permutation_argb();
-  }
-  if (channel_abgr) {
-    Log::Info["main"] << "Force ABGR color channel order";
-    set_channel_permutation_abgr();
-  }
 
   Data &data = Data::get_instance();
   if (!data.load(data_dir)) {

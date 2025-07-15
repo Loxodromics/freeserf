@@ -36,20 +36,6 @@ Uint32 VideoSDL::Bmask = 0xFF000000;
 Uint32 VideoSDL::Amask = 0x000000FF;
 Uint32 VideoSDL::pixel_format = SDL_PIXELFORMAT_RGBA8888;
 
-// Global debug flags for color channel debugging
-bool global_debug_color_channels = false;
-bool global_swap_rb_channels = false;
-
-// Global flags for color channel permutations
-enum class ChannelPermutation {
-  NONE = 0,
-  RGBA = 1,
-  BGRA = 2,
-  ARGB = 3,
-  ABGR = 4
-};
-
-ChannelPermutation global_channel_permutation = ChannelPermutation::NONE;
 
 VideoSDL::VideoSDL() {
   screen = nullptr;
@@ -172,38 +158,6 @@ Video::get_instance() {
   return instance;
 }
 
-// Function to enable color channel debugging
-void set_debug_color_channels(bool enable) {
-  global_debug_color_channels = enable;
-  Log::Debug["video"] << "set_debug_color_channels: " << (enable ? "ENABLED" : "DISABLED");
-}
-
-// Function to enable R/B channel swapping
-void set_swap_rb_channels(bool enable) {
-  global_swap_rb_channels = enable;
-  Log::Debug["video"] << "set_swap_rb_channels: " << (enable ? "ENABLED" : "DISABLED");
-}
-
-// Functions to set color channel permutations
-void set_channel_permutation_rgba() {
-  global_channel_permutation = ChannelPermutation::RGBA;
-  Log::Debug["video"] << "set_channel_permutation_rgba: ENABLED";
-}
-
-void set_channel_permutation_bgra() {
-  global_channel_permutation = ChannelPermutation::BGRA;
-  Log::Debug["video"] << "set_channel_permutation_bgra: ENABLED";
-}
-
-void set_channel_permutation_argb() {
-  global_channel_permutation = ChannelPermutation::ARGB;
-  Log::Debug["video"] << "set_channel_permutation_argb: ENABLED";
-}
-
-void set_channel_permutation_abgr() {
-  global_channel_permutation = ChannelPermutation::ABGR;
-  Log::Debug["video"] << "set_channel_permutation_abgr: ENABLED";
-}
 
 SDL_Surface *
 VideoSDL::create_surface(int width, int height) {
@@ -310,17 +264,10 @@ VideoSDL::warp_mouse(int x, int y) {
 }
 
 void
-VideoSDL::debug_validate_and_swap_channels(SDL_Surface *surf) {
-  Log::Debug["video"] << "=== debug_validate_and_swap_channels: ENTRY ===";
-  
+VideoSDL::apply_color_channel_fix(SDL_Surface *surf) {
   if (surf == nullptr || surf->pixels == nullptr) {
-    Log::Debug["video"] << "debug_validate_and_swap_channels: Invalid surface";
-    Log::Debug["video"] << "=== debug_validate_and_swap_channels: EXIT (invalid surface) ===";
     return;
   }
-  
-  Log::Debug["video"] << "debug_validate_and_swap_channels: Processing surface "
-                      << surf->w << "x" << surf->h;
   
   // Lock surface for pixel access
 #ifdef USE_SDL3
@@ -328,95 +275,27 @@ VideoSDL::debug_validate_and_swap_channels(SDL_Surface *surf) {
 #else
   if (SDL_LockSurface(surf) < 0) {
 #endif
-    Log::Debug["video"] << "debug_validate_and_swap_channels: Could not lock surface";
-    Log::Debug["video"] << "=== debug_validate_and_swap_channels: EXIT (lock failed) ===";
     return;
   }
   
   uint32_t *pixels = (uint32_t *)surf->pixels;
   int pixel_count = surf->w * surf->h;
   
-  // Sample first few pixels to validate color channels
-  Log::Debug["video"] << "First 4 pixels (raw): ";
-  for (int i = 0; i < 4 && i < pixel_count; i++) {
+  // Apply the correct color channel permutation for asset loading
+  // This fixes the color channel ordering issue found during SDL3 migration
+  for (int i = 0; i < pixel_count; i++) {
     uint32_t pixel = pixels[i];
     uint8_t r = (pixel & Rmask) >> (__builtin_ctz(Rmask));
     uint8_t g = (pixel & Gmask) >> (__builtin_ctz(Gmask));
     uint8_t b = (pixel & Bmask) >> (__builtin_ctz(Bmask));
     uint8_t a = (pixel & Amask) >> (__builtin_ctz(Amask));
-    Log::Debug["video"] << "  Pixel " << i << ": 0x" << std::hex << pixel << std::dec 
-                        << " R=" << (int)r << " G=" << (int)g << " B=" << (int)b << " A=" << (int)a;
-  }
-  
-  // Apply channel permutations if enabled
-  if (global_swap_rb_channels) {
-    Log::Debug["video"] << "debug_validate_and_swap_channels: Swapping R and B channels";
     
-    for (int i = 0; i < pixel_count; i++) {
-      uint32_t pixel = pixels[i];
-      uint8_t r = (pixel & Rmask) >> (__builtin_ctz(Rmask));
-      uint8_t g = (pixel & Gmask) >> (__builtin_ctz(Gmask));
-      uint8_t b = (pixel & Bmask) >> (__builtin_ctz(Bmask));
-      uint8_t a = (pixel & Amask) >> (__builtin_ctz(Amask));
-      
-      // Swap R and B channels
-      pixels[i] = (a << (__builtin_ctz(Amask))) | (b << (__builtin_ctz(Rmask))) | 
-                  (g << (__builtin_ctz(Gmask))) | (r << (__builtin_ctz(Bmask)));
-    }
-  }
-  
-  // Apply specific channel permutations
-  if (global_channel_permutation != ChannelPermutation::NONE) {
-    const char* permutation_name = "UNKNOWN";
-    switch (global_channel_permutation) {
-      case ChannelPermutation::RGBA: permutation_name = "RGBA"; break;
-      case ChannelPermutation::BGRA: permutation_name = "BGRA"; break;
-      case ChannelPermutation::ARGB: permutation_name = "ARGB"; break;
-      case ChannelPermutation::ABGR: permutation_name = "ABGR"; break;
-      default: break;
-    }
-    
-    Log::Debug["video"] << "debug_validate_and_swap_channels: Applying " << permutation_name << " channel permutation";
-    
-    for (int i = 0; i < pixel_count; i++) {
-      uint32_t pixel = pixels[i];
-      uint8_t r = (pixel & Rmask) >> (__builtin_ctz(Rmask));
-      uint8_t g = (pixel & Gmask) >> (__builtin_ctz(Gmask));
-      uint8_t b = (pixel & Bmask) >> (__builtin_ctz(Bmask));
-      uint8_t a = (pixel & Amask) >> (__builtin_ctz(Amask));
-      
-      // Apply the requested permutation
-      // Current format is RGBA8888, so we need to rearrange channels
-      switch (global_channel_permutation) {
-        case ChannelPermutation::RGBA:
-          // No change needed - already RGBA
-          break;
-        case ChannelPermutation::BGRA:
-          // BGRA: B->R, G->G, R->B, A->A
-          pixels[i] = (a << (__builtin_ctz(Amask))) | (r << (__builtin_ctz(Rmask))) | 
-                      (g << (__builtin_ctz(Gmask))) | (b << (__builtin_ctz(Bmask)));
-          break;
-        case ChannelPermutation::ARGB:
-          // ARGB: A->R, R->G, G->B, B->A
-//          pixels[i] = (b << (__builtin_ctz(Amask))) | (a << (__builtin_ctz(Rmask))) |
-//                      (r << (__builtin_ctz(Gmask))) | (g << (__builtin_ctz(Bmask)));
-
-          pixels[i] = (r << (__builtin_ctz(Amask))) | (a << (__builtin_ctz(Bmask))) |
-                      (b << (__builtin_ctz(Gmask))) | (g << (__builtin_ctz(Rmask)));
-          break;
-        case ChannelPermutation::ABGR:
-          // ABGR: A->R, B->G, G->B, R->A
-          pixels[i] = (r << (__builtin_ctz(Amask))) | (a << (__builtin_ctz(Rmask))) | 
-                      (b << (__builtin_ctz(Gmask))) | (g << (__builtin_ctz(Bmask)));
-          break;
-        default:
-          break;
-      }
-    }
+    // Apply the correct permutation: r->A, a->B, b->G, g->R
+    pixels[i] = (r << (__builtin_ctz(Amask))) | (a << (__builtin_ctz(Bmask))) |
+                (b << (__builtin_ctz(Gmask))) | (g << (__builtin_ctz(Rmask)));
   }
   
   SDL_UnlockSurface(surf);
-  Log::Debug["video"] << "=== debug_validate_and_swap_channels: EXIT (completed) ===";
 }
 
 SDL_Surface *
@@ -429,23 +308,6 @@ VideoSDL::create_surface_from_data(void *data, int width, int height) {
     throw ExceptionSDL("Unable to create sprite surface");
   }
   
-  // Debug: Log pixel format information for troubleshooting
-  Log::Debug["video"] << "create_surface_from_data: Debug flags check - global_debug_color_channels=" 
-                      << (global_debug_color_channels ? "true" : "false") 
-                      << ", global_swap_rb_channels=" << (global_swap_rb_channels ? "true" : "false")
-                      << ", global_channel_permutation=" << (int)global_channel_permutation;
-  
-  if (global_debug_color_channels) {
-    Log::Debug["video"] << "create_surface_from_data: Creating surface " << width << "x" << height;
-    Log::Debug["video"] << "  Pixel format: " << SDL_GetPixelFormatName((SDL_PixelFormat)pixel_format);
-    Log::Debug["video"] << "  Masks - R: 0x" << std::hex << Rmask << " G: 0x" << Gmask 
-                        << " B: 0x" << Bmask << " A: 0x" << Amask << std::dec;
-#ifdef USE_SDL3
-    Log::Debug["video"] << "  Input surface format: " << SDL_GetPixelFormatName(surf->format);
-#else
-    Log::Debug["video"] << "  Input surface format: " << SDL_GetPixelFormatName(surf->format->format);
-#endif
-  }
 
   /* Convert to screen format */
 #ifdef USE_SDL3
@@ -460,15 +322,8 @@ VideoSDL::create_surface_from_data(void *data, int width, int height) {
 
   SDL_FreeSurface(surf);
 
-  // Debug: Add color channel validation/swapping for troubleshooting
-  if (global_debug_color_channels) {
-#ifdef USE_SDL3
-    Log::Debug["video"] << "  Converted surface format: " << SDL_GetPixelFormatName(surf_screen->format);
-#else
-    Log::Debug["video"] << "  Converted surface format: " << SDL_GetPixelFormatName(surf_screen->format->format);
-#endif
-    debug_validate_and_swap_channels(surf_screen);
-  }
+  // Apply color channel fix for SDL3 migration
+  apply_color_channel_fix(surf_screen);
 
   return surf_screen;
 }
