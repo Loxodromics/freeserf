@@ -29,8 +29,10 @@ add_definitions(-DPACKAGE_BUGREPORT="https://github.com/freeserf/freeserf/issues
 include(CppLint)
 enable_check_style()
 
+# Set up SDL3 optional dependencies (mixer/image) from source
+setup_sdl3_optional_dependencies()
+
 # Find packages provided by Conan
-find_package(SDL3 REQUIRED)
 find_package(GTest REQUIRED)
 
 add_subdirectory(src)

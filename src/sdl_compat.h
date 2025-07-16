@@ -103,13 +103,13 @@
     #undef SDL_IsGameController
   #endif
   
-  // TODO: Re-enable when SDL3_mixer/SDL3_image FetchContent is working
-  //#ifdef ENABLE_SDL_MIXER
-  //  #include <SDL3_mixer/SDL_mixer.h>
-  //#endif
-  //#ifdef ENABLE_SDL_IMAGE
-  //  #include <SDL3_image/SDL_image.h>
-  //#endif
+  // SDL3_mixer and SDL3_image are now built via FetchContent
+  #ifdef ENABLE_SDL_MIXER
+    #include <SDL3_mixer/SDL_mixer.h>
+  #endif
+  #ifdef ENABLE_SDL_IMAGE
+    #include <SDL3_image/SDL_image.h>
+  #endif
 #else
   #include <SDL.h>
   #ifdef ENABLE_SDL_MIXER
@@ -190,8 +190,68 @@ bool SDL_RenderFillRect_Compat(SDL_Renderer *renderer, const SDL_Rect *rect);
 #define SDL_COMPAT_AUDIO_QUIT() SDL_QuitSubSystem(SDL_INIT_AUDIO)
 
 // SDL3 Mix_OpenAudio compatibility wrapper
-#define SDL_COMPAT_MIX_OPEN_AUDIO(freq, format, channels, chunksize) \
-  Mix_OpenAudio(freq, format, channels, chunksize)
+inline bool SDL_COMPAT_MIX_OPEN_AUDIO(int freq, SDL_AudioFormat format, int channels, int chunksize) {
+  SDL_AudioSpec spec = {format, channels, freq};
+  return Mix_OpenAudio(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec);
+}
+
+// SDL3 RWops -> IOStream compatibility
+#undef SDL_RWops
+#define SDL_RWops SDL_IOStream
+#undef SDL_RWFromMem
+#define SDL_RWFromMem SDL_IOFromMem
+#undef SDL_LoadWAV_RW
+#define SDL_LoadWAV_RW SDL_LoadWAV_IO
+#define Mix_LoadWAV_RW Mix_LoadWAV_IO
+#define Mix_LoadMUS_RW Mix_LoadMUS_IO
+
+// SDL3 Mix_GetError compatibility (uses SDL_GetError)
+#define Mix_GetError SDL_GetError
+
+// SDL3 version compatibility
+typedef struct SDL_version { 
+  Uint8 major; 
+  Uint8 minor; 
+  Uint8 patch; 
+} SDL_version;
+
+inline void SDL_GetVersion(SDL_version *ver) {
+  int version = SDL_GetVersion();
+  ver->major = (version >> 16) & 0xFF;
+  ver->minor = (version >> 8) & 0xFF;
+  ver->patch = version & 0xFF;
+}
+
+inline const SDL_version* Mix_Linked_Version() { 
+  static SDL_version version = {3, 0, 0}; // SDL3_mixer version
+  return &version;
+}
+
+// SDL3 LoadWAV compatibility wrapper
+inline Mix_Chunk* SDL_LoadWAV_IO_Compat(SDL_IOStream *src, int freesrc) {
+  SDL_AudioSpec spec;
+  Uint8 *audio_buf;
+  Uint32 audio_len;
+  if (!SDL_LoadWAV_IO(src, freesrc, &spec, &audio_buf, &audio_len)) {
+    return nullptr;
+  }
+  
+  Mix_Chunk *chunk = (Mix_Chunk*)SDL_malloc(sizeof(Mix_Chunk));
+  if (!chunk) {
+    SDL_free(audio_buf);
+    return nullptr;
+  }
+  
+  chunk->allocated = 1;
+  chunk->abuf = audio_buf;
+  chunk->alen = audio_len;
+  chunk->volume = 128;
+  
+  return chunk;
+}
+
+#undef SDL_LoadWAV_RW
+#define SDL_LoadWAV_RW SDL_LoadWAV_IO_Compat
 
 // SDL3 window/renderer creation changes  
 #define SDL_CreateRenderer(window, index, flags) SDL_CreateRenderer(window, NULL)

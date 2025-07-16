@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 option(USE_SDL3 "Use SDL3 instead of SDL2" ON)
-option(ENABLE_SDL_MIXER "Enable audio support using SDL_mixer" OFF)  # Temporarily disabled for SDL3
+option(ENABLE_SDL_MIXER "Enable audio support using SDL_mixer" ON)  # Re-enabled for SDL3 via FetchContent
 option(ENABLE_SDL_IMAGE "Enable image loading using SDL_image" OFF)  # Temporarily disabled for SDL3
 
 if(USE_SDL3)

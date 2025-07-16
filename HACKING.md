@@ -10,11 +10,11 @@ Use the following commands to build (it is recommended to build in a separate di
 
 ``` shell
 $ mkdir build && cd build
-$ cmake -G Ninja ..
+$ cmake -G Ninja -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON ..
 $ ninja
 ```
 
-**Note**: SDL3 is now the default. To use SDL2, add `-DUSE_SDL3=OFF` to the cmake command.
+**Note**: SDL3 is now the default with full audio support. To use SDL2, add `-DUSE_SDL3=OFF` to the cmake command.
 
 ### Modern Build (Conan 2 Package Manager) - Recommended
 
@@ -27,7 +27,7 @@ $ conan install . --output-folder=build --build=missing
 
 # Build project with Conan 2
 $ cd build
-$ cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
+$ cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON
 $ ninja
 ```
 
@@ -38,6 +38,7 @@ You can also select platform dependent [generator](https://cmake.org/cmake/help/
 Some useful configure variables (set as environment variable or with `-D` command line option):
 
 * `USE_SDL3` - Use SDL3 instead of SDL2 (default: ON)
+* `ENABLE_SDL_MIXER` - Enable audio support (default: ON for SDL3, OFF for SDL2)
 * `SDL2_DIR` - path to SDL2 root directory (for SDL2 builds)
 * `SDL2_mixer_DIR` - path to SDL2_mixer root directory (optional, for SDL2 builds)
 * `SDL2_image_DIR` - path to SDL2_image root directory (optional, for SDL2 builds)
@@ -48,7 +49,8 @@ Dependencies
 ### Traditional Build Dependencies
 
 **SDL3 Build (Default)**:
-* SDL3 is automatically built from source via CMake FetchContent
+* SDL3 core: Available through package managers or built from source
+* SDL3_mixer: Automatically built from source via CMake FetchContent (not available in package managers yet)
 * No manual dependency installation required
 
 **SDL2 Build (Legacy)**:
@@ -59,8 +61,9 @@ Dependencies
 ### Conan 2 Build Dependencies
 
 * [Conan 2.0+](https://conan.io/) package manager
-* All other dependencies are automatically managed through `conanfile.py`:
-  - SDL3: Built from source via FetchContent (default)
+* Hybrid dependency approach for optimal stability:
+  - SDL3: sdl/3.2.14 from Conan (default)
+  - SDL3_mixer: Built from source via FetchContent (not available in Conan yet)
   - SDL2: sdl/2.28.3 (legacy support)
   - sdl_mixer/2.8.0 (optional, SDL2 only)
   - sdl_image/2.8.2 (optional, SDL2 only)
@@ -69,9 +72,24 @@ Dependencies
 ### SDL3 Migration Status
 
 * **Core SDL3**: ✅ Complete (video, events, rendering, timers)
-* **SDL3_mixer**: ⏳ Temporarily disabled (audio currently uses dummy implementation)
+* **SDL3_mixer**: ✅ Complete (audio fully working with FetchContent build)
 * **SDL3_image**: ⏳ Temporarily disabled (sprite loading uses dummy implementation)
-* **Compatibility**: ✅ SDL2/SDL3 compatibility layer in `src/sdl_compat.h`
+* **Compatibility**: ✅ Full SDL2/SDL3 compatibility layer in `src/sdl_compat.h` including audio support
+
+### Audio Testing
+
+To test audio functionality:
+
+``` shell
+# Run the game with audio enabled
+$ ./src/FreeSerf.app/Contents/MacOS/FreeSerf  # macOS
+$ ./src/FreeSerf                              # Linux
+
+# Look for audio initialization messages:
+# Info: [audio] Initializing "sdlmixer".
+# Info: [audio:SDL_mixer] Initializing SDL_mixer 3.0.0
+# Info: [audio:SDL_mixer] Initialized
+```
 
 Coding style
 ------------

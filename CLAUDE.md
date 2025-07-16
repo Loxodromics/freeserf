@@ -44,14 +44,14 @@ ninja check_style
 ```bash
 # Traditional Build with SDL3 (default)
 mkdir build && cd build
-cmake -G Ninja ..
+cmake -G Ninja -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON ..
 ninja
 
-# Conan 2 Build with SDL3
+# Conan 2 Build with SDL3 (recommended)
 mkdir build
 conan install . --output-folder=build --build=missing
 cd build
-cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
+cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON
 ninja
 
 # Run tests
@@ -110,22 +110,23 @@ ninja check_style
 
 ### Traditional Build
 - SDL3 (default) or SDL2 (legacy support)
-- SDL3_mixer/SDL2_mixer (temporarily disabled for SDL3, optional for audio)
+- SDL3_mixer/SDL2_mixer (SDL3_mixer built from source via FetchContent, optional for audio)
 - SDL3_image/SDL2_image (temporarily disabled for SDL3, optional for custom resources)
 - GoogleTest (automatically downloaded for tests)
 
 ### Conan 2 Build
 - Conan 2.0+ package manager
-- All dependencies managed through `conanfile.py`:
-  - SDL3: Built from source via FetchContent (default)
+- Hybrid dependency approach:
+  - SDL3: sdl/3.2.14 from Conan (default)
+  - SDL3_mixer: Built from source via FetchContent (not available in Conan yet)
   - SDL2: sdl/2.28.3, sdl_mixer/2.8.0, sdl_image/2.8.2 (legacy)
   - gtest/1.14.0 (for tests)
 
 ### SDL3 Migration Status
 - **Core SDL3**: ✅ Complete - Video, events, rendering, timers
-- **SDL3_mixer**: ⏳ Temporarily disabled - Will be re-enabled when stable packages available
+- **SDL3_mixer**: ✅ Complete - Audio fully working via FetchContent build
 - **SDL3_image**: ⏳ Temporarily disabled - Will be re-enabled when stable packages available
-- **Compatibility Layer**: ✅ Complete - `src/sdl_compat.h` provides SDL2/SDL3 abstraction
+- **Compatibility Layer**: ✅ Complete - `src/sdl_compat.h` provides SDL2/SDL3 abstraction with full audio support
 
 ## Testing
 
