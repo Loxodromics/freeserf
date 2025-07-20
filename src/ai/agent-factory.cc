@@ -1,12 +1,12 @@
 #include "agent-factory.h"
 #include "test/mock-agent.h"
+#include "scripted-agent.h"
 #include <stdexcept>
 
 std::unique_ptr<Agent> AgentFactory::create_agent(const AgentConfig& config) {
     switch (config.type) {
         case AgentType::SCRIPTED:
-            // TODO: Implement ScriptedAgent in future phases
-            throw std::runtime_error("ScriptedAgent not yet implemented");
+            return std::make_unique<ScriptedAgent>(config.difficulty, config.personality, config.name);
             
         case AgentType::NEURAL_NETWORK:
             // TODO: Implement NeuralAgent in future phases
@@ -24,8 +24,7 @@ std::unique_ptr<Agent> AgentFactory::create_agent(const AgentConfig& config) {
 std::unique_ptr<Agent> AgentFactory::create_scripted_agent(int difficulty, 
                                                           int personality,
                                                           const std::string& name) {
-    // For Phase 0, return MockAgent as placeholder
-    return std::make_unique<MockAgent>(name);
+    return std::make_unique<ScriptedAgent>(difficulty, personality, name);
 }
 
 std::unique_ptr<Agent> AgentFactory::create_neural_agent(const std::string& model_path,

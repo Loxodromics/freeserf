@@ -6,6 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 FreeSerf is a C++ implementation of the classic strategy game Settlers, using CMake as the build system. The project is structured with multiple static libraries and follows the Google C++ Style Guide.
 
+## Workflow
+After you implemented a step from @work-logs/phase0.3.md, compile and run the program, if that works, update @work-logs/phase0.3.md to reflect the current state and check it in your changes.
+
 ## Build Commands
 
 ### Traditional Build (current working approach)

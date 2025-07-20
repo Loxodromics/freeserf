@@ -56,16 +56,32 @@ void update_agent_player(Player* player, Game* game, uint16_t tick_delta) {
         // 2. Get actions from agent
         std::vector<AIAction> actions = agent->get_actions(game_state);
         
-        // 3. Log and execute actions
+        // 3. Validate and execute actions
         int actions_executed = 0;
         for (const auto& action : actions) {
             if (action.type != AIActionType::NO_ACTION) {
-                AILogger::log_action_taken(player_id, action);
+                // Validate action first
+                auto validation = AgentIntegration::ActionValidator::validate_action(action, game, player);
+                AILogger::log_action_validation(player_id, action, validation.is_valid, validation.failure_reason);
                 
-                // TODO: Implement actual action execution in Phase 0.3
-                // For now, just log the action as successful
-                AILogger::log_action_result(player_id, action, true, "Action logged (execution not yet implemented)", 1.0f);
-                actions_executed++;
+                if (validation.is_valid) {
+                    // Execute action
+                    std::vector<AgentIntegration::ActionResult> results = AgentIntegration::execute_actions({action}, game, player);
+                    
+                    if (!results.empty()) {
+                        const auto& result = results[0];
+                        float execution_time_ms = result.execution_time.count() / 1000.0f;
+                        
+                        AILogger::log_action_execution(player_id, action, result.success, 
+                                                     result.result_message, execution_time_ms, result.reward);
+                        
+                        if (result.success) {
+                            actions_executed++;
+                        }
+                    }
+                } else {
+                    AILogger::log_action_execution(player_id, action, false, validation.failure_reason, 0.0f, 0.0f);
+                }
             }
         }
         

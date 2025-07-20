@@ -54,6 +54,7 @@ set(GAME_SOURCES building.cc
                  map.cc
                  map-generator.cc
                  mission.cc
+                 pathfinder.cc
                  player.cc
                  random.cc
                  savegame.cc
@@ -63,6 +64,7 @@ set(GAME_SOURCES building.cc
                  ai/agent-integration.cc
                  ai/player-agent-extensions.cc
                  ai/ai-logger.cc
+                 ai/scripted-agent.cc
                  ai/test/mock-agent.cc)
 
 set(GAME_HEADERS building.h
@@ -74,6 +76,7 @@ set(GAME_HEADERS building.h
                  map-geometry.h
                  mission.h
                  objects.h
+                 pathfinder.h
                  player.h
                  random.h
                  resource.h
@@ -87,6 +90,7 @@ set(GAME_HEADERS building.h
                  ai/agent-integration.h
                  ai/player-agent-extensions.h
                  ai/ai-logger.h
+                 ai/scripted-agent.h
                  ai/test/mock-agent.h)
 
 add_library(game STATIC ${GAME_SOURCES} ${GAME_HEADERS})

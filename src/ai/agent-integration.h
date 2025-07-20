@@ -7,6 +7,24 @@
 #include "../game.h"
 #include <vector>
 #include <string>
+#include <chrono>
+
+/**
+ * Error codes for AI action validation and execution
+ */
+enum class ActionError {
+    SUCCESS = 0,
+    INVALID_POSITION = 1,
+    INSUFFICIENT_RESOURCES = 2,
+    TERRAIN_UNSUITABLE = 3,
+    POSITION_OCCUPIED = 4,
+    OUT_OF_TERRITORY = 5,
+    TOO_CLOSE_TO_BUILDING = 6,
+    NO_ADJACENT_FLAG = 7,
+    INVALID_ROAD_PATH = 8,
+    GAME_ENGINE_ERROR = 9,
+    UNKNOWN_ERROR = 10
+};
 
 /**
  * Agent Integration Manager
@@ -24,14 +42,47 @@ public:
     static GameState capture_game_state(const Game* game, const Player* player);
     static void update_game_state(GameState& state, const Game* game, const Player* player);
     
+    // Action validation
+    struct ActionValidationResult {
+        bool is_valid;
+        std::string failure_reason;
+        ActionError error_code;
+        float confidence;  // 0.0-1.0, confidence in the validation result
+    };
+    
+    class ActionValidator {
+    public:
+        static ActionValidationResult validate_action(const AIAction& action, const Game* game, const Player* player);
+        static ActionValidationResult validate_build_castle(MapPos pos, const Game* game, const Player* player);
+        static ActionValidationResult validate_build_flag(MapPos pos, const Game* game, const Player* player);
+        static ActionValidationResult validate_build_road(MapPos from, MapPos to, const Game* game, const Player* player);
+        static ActionValidationResult validate_build_building(MapPos pos, Building::Type type, const Game* game, const Player* player);
+    };
+    
     // Action execution
     struct ActionResult {
         bool success;
         float reward;
-        std::string failure_reason;
-        int error_code;
+        std::string result_message;
+        ActionError error_code;
+        std::chrono::microseconds execution_time;
     };
     
+    class ActionExecutor {
+    public:
+        static std::vector<ActionResult> execute_actions(const std::vector<AIAction>& actions, Game* game, Player* player);
+        
+    private:
+        static ActionResult execute_build_castle(const AIAction& action, Game* game, Player* player);
+        static ActionResult execute_build_flag(const AIAction& action, Game* game, Player* player);
+        static ActionResult execute_build_road(const AIAction& action, Game* game, Player* player);
+        static ActionResult execute_build_lumberjack(const AIAction& action, Game* game, Player* player);
+        static ActionResult execute_build_forester(const AIAction& action, Game* game, Player* player);
+        static ActionResult create_success_result(const std::string& message, float reward, std::chrono::microseconds exec_time);
+        static ActionResult create_failure_result(const std::string& message, ActionError error, std::chrono::microseconds exec_time);
+    };
+    
+    // Legacy execute_actions method (will delegate to ActionExecutor)
     static std::vector<ActionResult> execute_actions(const std::vector<AIAction>& actions,
                                                    Game* game, 
                                                    Player* player);

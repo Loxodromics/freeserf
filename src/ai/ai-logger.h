@@ -24,6 +24,17 @@ public:
     static void log_action_result(int player_id, const AIAction& action, 
                                   bool success, const std::string& reason, float reward = 0.0f);
     
+    // Phase 0.3: Enhanced action logging
+    static void log_action_validation(int player_id, const AIAction& action, 
+                                    bool is_valid, const std::string& reason);
+    static void log_action_execution(int player_id, const AIAction& action, 
+                                   bool success, const std::string& message, 
+                                   float execution_time_ms, float reward);
+    static void log_agent_state_change(int player_id, const std::string& old_state, 
+                                     const std::string& new_state);
+    static void log_reward_calculation(int player_id, float total_reward, 
+                                     const std::string& breakdown);
+    
     // Game state logging
     static void log_game_state_summary(const GameState& state, int player_id);
     static void log_performance_metrics(int player_id, float execution_time_ms, 

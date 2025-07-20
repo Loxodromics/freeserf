@@ -3,6 +3,8 @@
 #include "agent-factory.h"
 #include "ai-logger.h"
 #include "../game-manager.h"
+#include "../building.h"
+#include "../pathfinder.h"
 
 void AgentIntegration::attach_agent(Player* player, std::unique_ptr<Agent> agent) {
     PlayerAgentExtensions::set_agent(player, std::move(agent));
@@ -170,25 +172,314 @@ void AgentIntegration::update_game_state(GameState& state, const Game* game, con
     // TODO: Update only changed map areas if needed for performance
 }
 
+// ActionValidator implementation
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_action(
+    const AIAction& action, const Game* game, const Player* player) {
+    
+    switch (action.type) {
+        case AIActionType::BUILD_CASTLE:
+            return validate_build_castle(action.primary_position, game, player);
+            
+        case AIActionType::BUILD_FLAG:
+            return validate_build_flag(action.primary_position, game, player);
+            
+        case AIActionType::BUILD_ROAD:
+            return validate_build_road(action.primary_position, action.secondary_position, game, player);
+            
+        case AIActionType::BUILD_LUMBERJACK:
+            return validate_build_building(action.primary_position, Building::TypeLumberjack, game, player);
+            
+        case AIActionType::BUILD_FORESTER:
+            return validate_build_building(action.primary_position, Building::TypeForester, game, player);
+            
+        case AIActionType::NO_ACTION:
+        case AIActionType::WAIT:
+            return {true, "No action or wait - always valid", ActionError::SUCCESS, 1.0f};
+            
+        default:
+            return {false, "Unknown action type", ActionError::UNKNOWN_ERROR, 0.0f};
+    }
+}
+
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_build_castle(
+    MapPos pos, const Game* game, const Player* player) {
+    
+    // Use existing game validation method
+    if (!const_cast<Game*>(game)->can_build_castle(pos, player)) {
+        return {false, "Cannot build castle at position", ActionError::INVALID_POSITION, 1.0f};
+    }
+    
+    return {true, "Castle placement valid", ActionError::SUCCESS, 1.0f};
+}
+
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_build_flag(
+    MapPos pos, const Game* game, const Player* player) {
+    
+    // Use existing game validation method
+    if (!const_cast<Game*>(game)->can_build_flag(pos, player)) {
+        return {false, "Cannot build flag at position", ActionError::INVALID_POSITION, 1.0f};
+    }
+    
+    return {true, "Flag placement valid", ActionError::SUCCESS, 1.0f};
+}
+
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_build_road(
+    MapPos from, MapPos to, const Game* game, const Player* player) {
+    
+    // Create a simple road from start to end for validation
+    Road road;
+    road.start(from);
+    
+    // For now, do basic validation - full pathfinding will be done in execution
+    if (from == to) {
+        return {false, "Road start and end positions are the same", ActionError::INVALID_ROAD_PATH, 1.0f};
+    }
+    
+    MapPos dest;
+    bool water;
+    int result = const_cast<Game*>(game)->can_build_road(road, player, &dest, &water);
+    
+    if (result < 0) {
+        return {false, "Cannot build road at specified location", ActionError::INVALID_ROAD_PATH, 1.0f};
+    }
+    
+    return {true, "Road path valid", ActionError::SUCCESS, 1.0f};
+}
+
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_build_building(
+    MapPos pos, Building::Type type, const Game* game, const Player* player) {
+    
+    // Use existing game validation method
+    if (!const_cast<Game*>(game)->can_build_building(pos, type, player)) {
+        return {false, "Cannot build building at position", ActionError::INVALID_POSITION, 1.0f};
+    }
+    
+    return {true, "Building placement valid", ActionError::SUCCESS, 1.0f};
+}
+
+// ActionExecutor implementation
+std::vector<AgentIntegration::ActionResult> AgentIntegration::ActionExecutor::execute_actions(
+    const std::vector<AIAction>& actions, Game* game, Player* player) {
+    
+    std::vector<ActionResult> results;
+    
+    for (const auto& action : actions) {
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        ActionResult result;
+        
+        switch (action.type) {
+            case AIActionType::BUILD_CASTLE:
+                result = execute_build_castle(action, game, player);
+                break;
+                
+            case AIActionType::BUILD_FLAG:
+                result = execute_build_flag(action, game, player);
+                break;
+                
+            case AIActionType::BUILD_ROAD:
+                result = execute_build_road(action, game, player);
+                break;
+                
+            case AIActionType::BUILD_LUMBERJACK:
+                result = execute_build_lumberjack(action, game, player);
+                break;
+                
+            case AIActionType::BUILD_FORESTER:
+                result = execute_build_forester(action, game, player);
+                break;
+                
+            case AIActionType::NO_ACTION:
+            case AIActionType::WAIT:
+                {
+                    auto end_time = std::chrono::high_resolution_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+                    result = create_success_result("No action or wait completed", 0.0f, duration);
+                }
+                break;
+                
+            default:
+                {
+                    auto end_time = std::chrono::high_resolution_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+                    result = create_failure_result("Unknown action type", ActionError::UNKNOWN_ERROR, duration);
+                }
+                break;
+        }
+        
+        results.push_back(result);
+    }
+    
+    return results;
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_build_castle(
+    const AIAction& action, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Validate first
+    auto validation = ActionValidator::validate_build_castle(action.primary_position, game, player);
+    if (!validation.is_valid) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result(validation.failure_reason, validation.error_code, duration);
+    }
+    
+    // Execute using existing game method
+    if (game->build_castle(action.primary_position, player)) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_success_result("Castle built successfully", 10.0f, duration);
+    } else {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result("Failed to build castle", ActionError::GAME_ENGINE_ERROR, duration);
+    }
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_build_flag(
+    const AIAction& action, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Validate first
+    auto validation = ActionValidator::validate_build_flag(action.primary_position, game, player);
+    if (!validation.is_valid) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result(validation.failure_reason, validation.error_code, duration);
+    }
+    
+    // Execute using existing game method
+    if (game->build_flag(action.primary_position, player)) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_success_result("Flag built successfully", 1.0f, duration);
+    } else {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result("Failed to build flag", ActionError::GAME_ENGINE_ERROR, duration);
+    }
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_build_lumberjack(
+    const AIAction& action, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Validate first
+    auto validation = ActionValidator::validate_build_building(action.primary_position, Building::TypeLumberjack, game, player);
+    if (!validation.is_valid) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result(validation.failure_reason, validation.error_code, duration);
+    }
+    
+    // Execute using existing game method
+    if (game->build_building(action.primary_position, Building::TypeLumberjack, player)) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_success_result("Lumberjack built successfully", 5.0f, duration);
+    } else {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result("Failed to build lumberjack", ActionError::GAME_ENGINE_ERROR, duration);
+    }
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_build_forester(
+    const AIAction& action, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Validate first
+    auto validation = ActionValidator::validate_build_building(action.primary_position, Building::TypeForester, game, player);
+    if (!validation.is_valid) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result(validation.failure_reason, validation.error_code, duration);
+    }
+    
+    // Execute using existing game method
+    if (game->build_building(action.primary_position, Building::TypeForester, player)) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_success_result("Forester built successfully", 5.0f, duration);
+    } else {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result("Failed to build forester", ActionError::GAME_ENGINE_ERROR, duration);
+    }
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_build_road(
+    const AIAction& action, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    MapPos from = action.primary_position;
+    MapPos to = action.secondary_position;
+    
+    // Basic validation
+    if (from == to) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result("Road start and end positions are the same", ActionError::INVALID_ROAD_PATH, duration);
+    }
+    
+    // Use pathfinder to create road
+    PMap map = game->get_map();
+    Road road = pathfinder_map(map.get(), from, to);
+    
+    if (!road.is_valid()) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result("No valid path found for road", ActionError::INVALID_ROAD_PATH, duration);
+    }
+    
+    // Validate the road can be built
+    MapPos dest;
+    bool water;
+    int result = game->can_build_road(road, player, &dest, &water);
+    
+    if (result < 0) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result("Cannot build road at specified location", ActionError::INVALID_ROAD_PATH, duration);
+    }
+    
+    // Execute road building
+    if (game->build_road(road, player)) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_success_result("Road built successfully", 3.0f, duration);
+    } else {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result("Failed to build road", ActionError::GAME_ENGINE_ERROR, duration);
+    }
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::create_success_result(
+    const std::string& message, float reward, std::chrono::microseconds exec_time) {
+    
+    return {true, reward, message, ActionError::SUCCESS, exec_time};
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::create_failure_result(
+    const std::string& message, ActionError error, std::chrono::microseconds exec_time) {
+    
+    return {false, 0.0f, message, error, exec_time};
+}
+
 std::vector<AgentIntegration::ActionResult> AgentIntegration::execute_actions(
     const std::vector<AIAction>& actions,
     Game* game, 
     Player* player) {
     
-    std::vector<ActionResult> results;
-    
-    // TODO: Implement action execution in Phase 0.3
-    // For now, return failed results for all actions
-    for (const auto& action : actions) {
-        ActionResult result;
-        result.success = false;
-        result.reward = 0.0f;
-        result.failure_reason = "Action execution not yet implemented";
-        result.error_code = -1;
-        results.push_back(result);
-    }
-    
-    return results;
+    // Delegate to ActionExecutor
+    return ActionExecutor::execute_actions(actions, game, player);
 }
 
 AgentIntegration::PerformanceMetrics AgentIntegration::get_performance_metrics(const Player* player) {
@@ -240,8 +531,8 @@ void AgentIntegration::setup_ai_players(int ai_count) {
             continue;
         }
         
-        // Create a MockAgent for testing purposes
-        std::string agent_name = "MockAgent_P" + std::to_string(i);
+        // Create a ScriptedAgent
+        std::string agent_name = "ScriptedAgent_P" + std::to_string(i);
         auto agent = AgentFactory::create_scripted_agent(5, 0, agent_name);
         
         if (agent) {

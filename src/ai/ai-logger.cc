@@ -59,6 +59,63 @@ void AILogger::log_action_result(int player_id, const AIAction& action,
     }
 }
 
+// Phase 0.3: Enhanced action logging methods
+void AILogger::log_action_validation(int player_id, const AIAction& action, 
+                                    bool is_valid, const std::string& reason) {
+    if (!debug_enabled) return;
+    
+    std::string result = is_valid ? "VALID" : "INVALID";
+    
+    Log::Info["ai"] << "[AI-VALIDATE] " << get_player_prefix(player_id) 
+                    << ": " << get_action_description(action) << " -> " << result;
+    
+    if (!is_valid || !reason.empty()) {
+        Log::Info["ai"] << "    " << reason;
+    }
+}
+
+void AILogger::log_action_execution(int player_id, const AIAction& action, 
+                                   bool success, const std::string& message, 
+                                   float execution_time_ms, float reward) {
+    if (!debug_enabled) return;
+    
+    std::string result = success ? "SUCCESS" : "FAILED";
+    
+    Log::Info["ai"] << "[AI-EXECUTE] " << get_player_prefix(player_id) 
+                    << ": " << get_action_description(action) << " -> " << result
+                    << " (execution: " << std::fixed << std::setprecision(1) << execution_time_ms << "ms";
+    
+    if (success && reward != 0.0f) {
+        Log::Info["ai"] << ", reward: " << std::showpos << std::fixed << std::setprecision(1) << reward;
+    }
+    
+    Log::Info["ai"] << ")";
+    
+    if (!message.empty()) {
+        Log::Info["ai"] << "    " << message;
+    }
+}
+
+void AILogger::log_agent_state_change(int player_id, const std::string& old_state, 
+                                     const std::string& new_state) {
+    if (!debug_enabled) return;
+    
+    Log::Info["ai"] << "[AI-STATE] " << get_player_prefix(player_id) 
+                    << ": Agent state: " << old_state << " -> " << new_state;
+}
+
+void AILogger::log_reward_calculation(int player_id, float total_reward, 
+                                     const std::string& breakdown) {
+    if (!debug_enabled) return;
+    
+    Log::Info["ai"] << "[AI-REWARD] " << get_player_prefix(player_id) 
+                    << ": Total reward: " << std::showpos << std::fixed << std::setprecision(1) << total_reward;
+    
+    if (!breakdown.empty()) {
+        Log::Info["ai"] << " (" << breakdown << ")";
+    }
+}
+
 void AILogger::log_game_state_summary(const GameState& state, int player_id) {
     if (!debug_enabled) return;
     
