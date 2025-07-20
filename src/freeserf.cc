@@ -35,10 +35,50 @@
 #include "src/video-sdl.h"
 #include "src/ai/ai-logger.h"
 #include "src/ai/agent-integration.h"
+#include "src/mission.h"
 
 #ifdef WIN32
 # include "src/sdl_compat.h"
 #endif  // WIN32
+
+// Helper function to start a game with pre-configured AI players
+bool start_game_with_ai_players(int ai_player_count, bool ai_debug_mode) {
+  // Create a new game info with random seed
+  PGameInfo game_info(new GameInfo(Random()));
+  
+  // Define colors for up to 4 AI players
+  Player::Color ai_colors[] = {
+    {0x00, 0xe3, 0xe3},  // Cyan
+    {0xcf, 0x63, 0x63},  // Red  
+    {0x63, 0xcf, 0x63},  // Green
+    {0xcf, 0xcf, 0x63}   // Yellow
+  };
+  
+  // Add AI players with reasonable defaults
+  for (int i = 0; i < ai_player_count && i < 4; ++i) {
+    size_t character = 1 + (i % 12);  // Use characters 1-12 (avoiding 0 which is ERROR)
+    unsigned int intelligence = 40;
+    unsigned int supplies = 40; 
+    unsigned int reproduction = 40;
+    
+    game_info->add_player(character, ai_colors[i], intelligence, supplies, reproduction);
+  }
+  
+  // Start the game
+  GameManager &game_manager = GameManager::get_instance();
+  if (!game_manager.start_game(game_info)) {
+    return false;
+  }
+  
+  // Configure AI system
+  AILogger::set_debug_enabled(ai_debug_mode);
+  AgentIntegration::setup_ai_players(ai_player_count);
+  AILogger::log_game_started(ai_player_count);
+  Log::Info["main"] << "AI system initialized with " << ai_player_count 
+                    << " AI players, debug=" << (ai_debug_mode ? "ON" : "OFF");
+  
+  return true;
+}
 
 int
 main(int argc, char *argv[]) {
@@ -124,29 +164,35 @@ main(int argc, char *argv[]) {
     Audio::PTrack t = player->play_track(Audio::TypeMidiTrack0);
   }
 
-  GameManager &game_manager = GameManager::get_instance();
-
   /* Either load a save game if specified or
      start a new game. */
   if (!save_file.empty()) {
+    GameManager &game_manager = GameManager::get_instance();
     if (!game_manager.load_game(save_file)) {
       return EXIT_FAILURE;
     }
-  } else {
-    if (!game_manager.start_random_game()) {
+    
+    // Configure AI system for loaded games if requested
+    if (ai_debug_mode || ai_player_count > 0) {
+      AILogger::set_debug_enabled(ai_debug_mode);
+      
+      if (ai_player_count > 0) {
+        AgentIntegration::setup_ai_players(ai_player_count);
+        AILogger::log_game_started(ai_player_count);
+        Log::Info["main"] << "AI system initialized with " << ai_player_count 
+                          << " AI players, debug=" << (ai_debug_mode ? "ON" : "OFF");
+      }
+    }
+  } else if (ai_player_count > 0) {
+    // Start a new game with pre-configured AI players
+    if (!start_game_with_ai_players(ai_player_count, ai_debug_mode)) {
       return EXIT_FAILURE;
     }
-  }
-  
-  // Configure AI system if requested
-  if (ai_debug_mode || ai_player_count > 0) {
-    AILogger::set_debug_enabled(ai_debug_mode);
-    
-    if (ai_player_count > 0) {
-      AgentIntegration::setup_ai_players(ai_player_count);
-      AILogger::log_game_started(ai_player_count);
-      Log::Info["main"] << "AI system initialized with " << ai_player_count 
-                        << " AI players, debug=" << (ai_debug_mode ? "ON" : "OFF");
+  } else {
+    // Start a regular random game
+    GameManager &game_manager = GameManager::get_instance();
+    if (!game_manager.start_random_game()) {
+      return EXIT_FAILURE;
     }
   }
 
@@ -158,7 +204,7 @@ main(int argc, char *argv[]) {
   interface.set_size(screen_width, screen_height);
   interface.set_displayed(true);
 
-  if (save_file.empty()) {
+  if (save_file.empty() && ai_player_count == 0) {
     interface.open_game_init();
   }
 

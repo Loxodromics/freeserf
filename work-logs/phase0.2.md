@@ -347,6 +347,45 @@ Phase 0.2 provides a **solid foundation** for Phase 0.3: Action Execution Framew
 
 **Phase 0.2 is COMPLETE and ready for Phase 0.3! 🎯**
 
+### ✅ **LATEST UPDATE: Auto-Start Functionality Added**
+
+**Additional Enhancement Completed:**
+- **Auto-Start for AI Players**: When using `-a -p 1` (or other AI player counts), the game now automatically starts without requiring manual player selection.
+
+**New Implementation Details:**
+
+1. **Auto-Start Helper Function** (`src/freeserf.cc`):
+   ```cpp
+   bool start_game_with_ai_players(int ai_player_count, bool ai_debug_mode) {
+     // Creates GameInfo with pre-configured AI players
+     // Uses distinct colors: Cyan, Red, Green, Yellow
+     // Sets reasonable defaults: intelligence=40, supplies=40, reproduction=40
+   }
+   ```
+
+2. **Enhanced Game Startup Logic**:
+   - Skip UI initialization when AI players are configured
+   - Use custom GameInfo instead of random game generation
+   - Automatically configure and attach AI agents
+   - Direct entry into game loop
+
+3. **Updated Interface Behavior**:
+   ```cpp
+   if (save_file.empty() && ai_player_count == 0) {
+     interface.open_game_init();  // Only show UI for human-only games
+   }
+   ```
+
+**Validation Results:**
+```
+Info: [ai] AI debug logging enabled
+Info: [ai] [AI-ATTACH] Player0: MockAgent_P0 attached  
+Info: [ai] [AI-DEBUG] Game started with 1 AI players
+Info: [main] AI system initialized with 1 AI players, debug=ON
+```
+
+✅ **User Experience**: `./FreeSerf -a -p 1` now immediately starts a playable game with AI players and real-time debug logging without any human interaction required.
+
 ## Implementation Notes
 
 - **Start with simple data extraction** - get basic player resources first
