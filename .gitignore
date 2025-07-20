@@ -40,3 +40,10 @@ xcuserdata
 *.unsuccessfulbuild
 *.VC.db
 *.VC.VC.opendb
+
+# build directories
+build/
+cmake-build-*/
+
+# work logs
+work-logs/
