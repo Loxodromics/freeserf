@@ -250,12 +250,12 @@ MapPos AgentIntegration::ActionValidator::find_valid_castle_position_nearby(MapP
     int center_y = suggested_pos / map_cols;
     
     int positions_tested = 0;
-    const int max_positions = 150; // Limit search to stay within performance budget
+    const int max_positions = 300; // Increase search limit for better coverage
     
     // Search in expanding radius around the AI's suggested position
-    for (int radius = 1; radius <= 20 && positions_tested < max_positions; radius += 2) {
+    for (int radius = 1; radius <= 30 && positions_tested < max_positions; radius += 2) {
         // Test positions in a circle around the suggested position
-        for (int angle = 0; angle < 360 && positions_tested < max_positions; angle += 45) {
+        for (int angle = 0; angle < 360 && positions_tested < max_positions; angle += 30) {
             double rad = angle * 3.14159 / 180.0;
             int x = center_x + static_cast<int>(radius * std::cos(rad));
             int y = center_y + static_cast<int>(radius * std::sin(rad));
@@ -280,6 +280,52 @@ MapPos AgentIntegration::ActionValidator::find_valid_castle_position_nearby(MapP
     }
     
     AILogger::log_debug("No valid castle position found after testing " + std::to_string(positions_tested) + " positions");
+    return 0; // No valid position found
+}
+
+// Helper method to find valid building position near the AI's suggestion
+MapPos AgentIntegration::ActionValidator::find_valid_building_position_nearby(MapPos suggested_pos, Building::Type type, Game* game, Player* player) {
+    auto map = game->get_map();
+    int map_cols = map->get_cols();
+    int map_rows = map->get_rows();
+    
+    // Convert suggested position to coordinates for center-outward search
+    int center_x = suggested_pos % map_cols;
+    int center_y = suggested_pos / map_cols;
+    
+    int positions_tested = 0;
+    const int max_positions = 100; // Limit search to stay within performance budget
+    
+    // Search in expanding radius around the AI's suggested position
+    for (int radius = 1; radius <= 15 && positions_tested < max_positions; radius += 2) {
+        // Test positions in a circle around the suggested position
+        for (int angle = 0; angle < 360 && positions_tested < max_positions; angle += 45) {
+            double rad = angle * 3.14159 / 180.0;
+            int x = center_x + static_cast<int>(radius * std::cos(rad));
+            int y = center_y + static_cast<int>(radius * std::sin(rad));
+            
+            // Bounds check
+            if (x < 2 || x >= map_cols - 2 || y < 2 || y >= map_rows - 2) {
+                continue;
+            }
+            
+            MapPos test_pos = y * map_cols + x;
+            positions_tested++;
+            
+            // Use authoritative game validation
+            if (game->can_build_building(test_pos, type, player)) {
+                AILogger::log_debug("Found valid building position: " + std::to_string(test_pos) + 
+                                   " (type " + std::to_string(type) + ") " +
+                                   " (:" + std::to_string(x) + "," + std::to_string(y) + 
+                                   ") radius=" + std::to_string(radius) + 
+                                   " tested=" + std::to_string(positions_tested));
+                return test_pos;
+            }
+        }
+    }
+    
+    AILogger::log_debug("No valid building position found for type " + std::to_string(type) + 
+                       " after testing " + std::to_string(positions_tested) + " positions");
     return 0; // No valid position found
 }
 
@@ -320,12 +366,28 @@ AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::vali
 AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_build_building(
     MapPos pos, Building::Type type, const Game* game, const Player* player) {
     
-    // Use existing game validation method
-    if (!const_cast<Game*>(game)->can_build_building(pos, type, player)) {
-        return {false, "Cannot build building at position", ActionError::INVALID_POSITION, 1.0f};
+    Game* mutable_game = const_cast<Game*>(game);
+    Player* mutable_player = const_cast<Player*>(player);
+    
+    // First, try the AI's suggested position with authoritative validation
+    if (mutable_game->can_build_building(pos, type, player)) {
+        AILogger::log_debug("Building validation: AI position " + std::to_string(pos) + " is valid for building type " + std::to_string(type));
+        return {true, "Building placement valid", ActionError::SUCCESS, 1.0f};
     }
     
-    return {true, "Building placement valid", ActionError::SUCCESS, 1.0f};
+    // AI's position failed - use smart position finding to find a valid alternative
+    AILogger::log_debug("Building validation: AI position " + std::to_string(pos) + " invalid for building type " + std::to_string(type) + ", searching for alternative...");
+    
+    MapPos alternative_pos = find_valid_building_position_nearby(pos, type, mutable_game, mutable_player);
+    
+    if (alternative_pos != 0) {
+        AILogger::log_debug("Building validation: Found alternative position " + std::to_string(alternative_pos) + " for building type " + std::to_string(type));
+        return {true, "Building placement valid (corrected position)", ActionError::SUCCESS, 1.0f, alternative_pos};
+    }
+    
+    // No valid position found
+    AILogger::log_debug("Building validation: No valid building position found for type " + std::to_string(type));
+    return {false, "No valid building position available", ActionError::INVALID_POSITION, 0.0f};
 }
 
 // ActionExecutor implementation

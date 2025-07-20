@@ -45,6 +45,8 @@ public:
     
     // Agent interface implementation
     std::vector<AIAction> get_actions(const GameState& state) override;
+    // Enhanced version with Game and Player access for authoritative validation
+    std::vector<AIAction> get_actions(const GameState& state, Game* game, Player* player);
     int get_action_space_size() const override;
     std::vector<bool> get_valid_actions(const GameState& state) override;
     void set_difficulty(int difficulty) override;
@@ -60,22 +62,28 @@ public:
     
 private:
     // State machine decision methods
-    std::vector<AIAction> decide_castle_placement(const GameState& state);
-    std::vector<AIAction> decide_forester_placement(const GameState& state);
-    std::vector<AIAction> decide_lumberjack_placement(const GameState& state);
+    std::vector<AIAction> decide_castle_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
+    std::vector<AIAction> decide_forester_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
+    std::vector<AIAction> decide_lumberjack_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<AIAction> decide_road_construction(const GameState& state);
     std::vector<AIAction> decide_production_phase(const GameState& state);
     std::vector<AIAction> decide_expansion_phase(const GameState& state);
     
     // Position finding algorithms
     MapPos find_best_castle_position(const GameState& state, Game* game = nullptr, Player* player = nullptr);
-    MapPos find_forest_position_near(MapPos center, const GameState& state);
-    MapPos find_building_position_near(MapPos center, const GameState& state);
+    MapPos find_forest_position_near(MapPos center, const GameState& state, Game* game = nullptr, Player* player = nullptr);
+    MapPos find_building_position_near(MapPos center, const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<MapPos> plan_road_between(MapPos from, MapPos to, const GameState& state);
     
     // Castle position finding helpers
     MapPos find_castle_position_with_game_validation(const GameState& state, Game* game, Player* player);
     MapPos find_castle_position_fallback(const GameState& state);
+    
+    // Building position finding helpers
+    MapPos find_forest_position_with_game_validation(MapPos center, const GameState& state, Game* game, Player* player);
+    MapPos find_forest_position_fallback(MapPos center, const GameState& state);
+    MapPos find_building_position_with_game_validation(MapPos center, const GameState& state, Building::Type type, Game* game, Player* player);
+    MapPos find_building_position_fallback(MapPos center, const GameState& state);
     
     // Helper methods
     bool has_building_at(MapPos pos, const GameState& state);

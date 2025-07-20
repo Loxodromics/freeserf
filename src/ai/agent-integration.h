@@ -66,6 +66,8 @@ public:
     private:
         // Helper method for smart castle position finding
         static MapPos find_valid_castle_position_nearby(MapPos suggested_pos, Game* game, Player* player);
+        // Helper method for smart building position finding
+        static MapPos find_valid_building_position_nearby(MapPos suggested_pos, Building::Type type, Game* game, Player* player);
     };
     
     // Action execution

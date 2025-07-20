@@ -19,6 +19,11 @@ ScriptedAgent::ScriptedAgent(int difficulty, int personality, const std::string&
 }
 
 std::vector<AIAction> ScriptedAgent::get_actions(const GameState& state) {
+    // Delegate to enhanced version without Game/Player access (fallback)
+    return get_actions(state, nullptr, nullptr);
+}
+
+std::vector<AIAction> ScriptedAgent::get_actions(const GameState& state, Game* game, Player* player) {
     // Update agent state based on current game situation
     update_agent_state(state);
     
@@ -35,15 +40,15 @@ std::vector<AIAction> ScriptedAgent::get_actions(const GameState& state) {
     
     switch (current_state) {
         case AgentState::NEED_CASTLE:
-            actions = decide_castle_placement(state);
+            actions = decide_castle_placement(state, game, player);
             break;
             
         case AgentState::NEED_FORESTER:
-            actions = decide_forester_placement(state);
+            actions = decide_forester_placement(state, game, player);
             break;
             
         case AgentState::NEED_LUMBERJACK:
-            actions = decide_lumberjack_placement(state);
+            actions = decide_lumberjack_placement(state, game, player);
             break;
             
         case AgentState::NEED_ROADS:
@@ -99,13 +104,13 @@ bool ScriptedAgent::is_ready() const {
 }
 
 // State machine decision methods
-std::vector<AIAction> ScriptedAgent::decide_castle_placement(const GameState& state) {
+std::vector<AIAction> ScriptedAgent::decide_castle_placement(const GameState& state, Game* game, Player* player) {
     // If we already have a castle, move to next state
     if (state.self.has_castle) {
         return {AIAction::no_action()};
     }
     
-    MapPos castle_pos = find_best_castle_position(state);
+    MapPos castle_pos = find_best_castle_position(state, game, player);
     if (castle_pos != 0) {
         castle_position = castle_pos;
         AIAction action = AIAction::build_castle(castle_pos, 1.0f);
@@ -115,13 +120,13 @@ std::vector<AIAction> ScriptedAgent::decide_castle_placement(const GameState& st
     return {AIAction::no_action()};
 }
 
-std::vector<AIAction> ScriptedAgent::decide_forester_placement(const GameState& state) {
+std::vector<AIAction> ScriptedAgent::decide_forester_placement(const GameState& state, Game* game, Player* player) {
     // Check if we already have a forester
     if (state.self.building_counts[static_cast<int>(Building::TypeForester)] > 0) {
         return {AIAction::no_action()};
     }
     
-    MapPos forester_pos = find_forest_position_near(castle_position, state);
+    MapPos forester_pos = find_forest_position_near(castle_position, state, game, player);
     if (forester_pos != 0) {
         forester_position = forester_pos;
         AIAction action = AIAction::build_forester(forester_pos, 0.8f);
@@ -131,7 +136,7 @@ std::vector<AIAction> ScriptedAgent::decide_forester_placement(const GameState& 
     return {AIAction::no_action()};
 }
 
-std::vector<AIAction> ScriptedAgent::decide_lumberjack_placement(const GameState& state) {
+std::vector<AIAction> ScriptedAgent::decide_lumberjack_placement(const GameState& state, Game* game, Player* player) {
     // Check if we already have a lumberjack
     if (state.self.building_counts[static_cast<int>(Building::TypeLumberjack)] > 0) {
         return {AIAction::no_action()};
@@ -139,7 +144,7 @@ std::vector<AIAction> ScriptedAgent::decide_lumberjack_placement(const GameState
     
     // Place lumberjack near forester or castle
     MapPos reference_pos = (forester_position != 0) ? forester_position : castle_position;
-    MapPos lumberjack_pos = find_building_position_near(reference_pos, state);
+    MapPos lumberjack_pos = find_building_position_near(reference_pos, state, game, player);
     
     if (lumberjack_pos != 0) {
         lumberjack_position = lumberjack_pos;
@@ -320,8 +325,71 @@ MapPos ScriptedAgent::find_castle_position_fallback(const GameState& state) {
     return 0;
 }
 
-MapPos ScriptedAgent::find_forest_position_near(MapPos center, const GameState& state) {
+MapPos ScriptedAgent::find_forest_position_near(MapPos center, const GameState& state, Game* game, Player* player) {
+    // Use authoritative game validation when available
+    if (game != nullptr && player != nullptr) {
+        return find_forest_position_with_game_validation(center, state, game, player);
+    }
+    
+    // Fallback to simplified validation (legacy behavior)
+    return find_forest_position_fallback(center, state);
+}
+
+// NEW: Authoritative forester position finding using game validation
+MapPos ScriptedAgent::find_forest_position_with_game_validation(MapPos center, const GameState& state, Game* game, Player* player) {
     const auto& map = state.map;
+    
+    AILogger::log_debug("Forester search: Using authoritative game validation near position " + std::to_string(center));
+    
+    auto game_map = game->get_map();
+    int map_cols = game_map->get_cols();
+    int map_rows = game_map->get_rows();
+    
+    // Convert center position to coordinates
+    int center_x = center % map_cols;
+    int center_y = center / map_cols;
+    
+    int positions_tested = 0;
+    const int max_positions = 80; // Limit search for performance
+    
+    // Search in expanding radius around center
+    for (int radius = 2; radius <= 12 && positions_tested < max_positions; radius += 2) {
+        for (int angle = 0; angle < 360 && positions_tested < max_positions; angle += 45) {
+            double rad = angle * 3.14159 / 180.0;
+            int x = center_x + static_cast<int>(radius * std::cos(rad));
+            int y = center_y + static_cast<int>(radius * std::sin(rad));
+            
+            // Bounds check
+            if (x < 2 || x >= map_cols - 2 || y < 2 || y >= map_rows - 2) {
+                continue;
+            }
+            
+            MapPos pos = y * map_cols + x;
+            positions_tested++;
+            
+            // Use authoritative game validation for forester
+            if (game->can_build_building(pos, Building::TypeForester, player)) {
+                // Check if there are trees nearby for the forester to work with
+                if (count_trees_near(pos, state, 3) >= 1) {
+                    AILogger::log_debug("Forester found: pos=" + std::to_string(pos) + 
+                                       " (" + std::to_string(x) + "," + std::to_string(y) + 
+                                       ") radius=" + std::to_string(radius) + 
+                                       " tested=" + std::to_string(positions_tested));
+                    return pos;
+                }
+            }
+        }
+    }
+    
+    AILogger::log_debug("Forester search failed: tested " + std::to_string(positions_tested) + " positions");
+    return 0; // No valid position found
+}
+
+// LEGACY: Fallback forester position finding using simplified validation
+MapPos ScriptedAgent::find_forest_position_fallback(MapPos center, const GameState& state) {
+    const auto& map = state.map;
+    
+    AILogger::log_debug("Forester search: Using fallback validation (simplified)");
     
     // Use safe dimensions like in castle position finding
     size_t actual_map_size = map.terrain_types.size();
@@ -358,8 +426,69 @@ MapPos ScriptedAgent::find_forest_position_near(MapPos center, const GameState& 
     return 0;  // No suitable position found
 }
 
-MapPos ScriptedAgent::find_building_position_near(MapPos center, const GameState& state) {
+MapPos ScriptedAgent::find_building_position_near(MapPos center, const GameState& state, Game* game, Player* player) {
+    // Use authoritative game validation when available
+    if (game != nullptr && player != nullptr) {
+        return find_building_position_with_game_validation(center, state, Building::TypeLumberjack, game, player);
+    }
+    
+    // Fallback to simplified validation (legacy behavior)
+    return find_building_position_fallback(center, state);
+}
+
+// NEW: Authoritative building position finding using game validation
+MapPos ScriptedAgent::find_building_position_with_game_validation(MapPos center, const GameState& state, Building::Type type, Game* game, Player* player) {
     const auto& map = state.map;
+    
+    AILogger::log_debug("Building search: Using authoritative game validation for type " + std::to_string(type) + " near position " + std::to_string(center));
+    
+    auto game_map = game->get_map();
+    int map_cols = game_map->get_cols();
+    int map_rows = game_map->get_rows();
+    
+    // Convert center position to coordinates
+    int center_x = center % map_cols;
+    int center_y = center / map_cols;
+    
+    int positions_tested = 0;
+    const int max_positions = 60; // Limit search for performance
+    
+    // Search in expanding radius around center
+    for (int radius = 1; radius <= 10 && positions_tested < max_positions; radius += 2) {
+        for (int angle = 0; angle < 360 && positions_tested < max_positions; angle += 60) {
+            double rad = angle * 3.14159 / 180.0;
+            int x = center_x + static_cast<int>(radius * std::cos(rad));
+            int y = center_y + static_cast<int>(radius * std::sin(rad));
+            
+            // Bounds check
+            if (x < 2 || x >= map_cols - 2 || y < 2 || y >= map_rows - 2) {
+                continue;
+            }
+            
+            MapPos pos = y * map_cols + x;
+            positions_tested++;
+            
+            // Use authoritative game validation for building
+            if (game->can_build_building(pos, type, player)) {
+                AILogger::log_debug("Building found: pos=" + std::to_string(pos) + 
+                                   " (type " + std::to_string(type) + ") " +
+                                   " (" + std::to_string(x) + "," + std::to_string(y) + 
+                                   ") radius=" + std::to_string(radius) + 
+                                   " tested=" + std::to_string(positions_tested));
+                return pos;
+            }
+        }
+    }
+    
+    AILogger::log_debug("Building search failed for type " + std::to_string(type) + ": tested " + std::to_string(positions_tested) + " positions");
+    return 0; // No valid position found
+}
+
+// LEGACY: Fallback building position finding using simplified validation
+MapPos ScriptedAgent::find_building_position_fallback(MapPos center, const GameState& state) {
+    const auto& map = state.map;
+    
+    AILogger::log_debug("Building search: Using fallback validation (simplified)");
     
     // Use safe dimensions
     size_t actual_map_size = map.terrain_types.size();
@@ -565,13 +694,15 @@ void ScriptedAgent::update_agent_state(const GameState& state) {
         case AgentState::NEED_CASTLE:
             if (state.self.has_castle) {
                 current_state = AgentState::NEED_FORESTER;
-                castle_position = 0;  // Will be updated when we know castle location
-                
-                // Find castle position from building list
-                for (size_t i = 0; i < state.self.building_positions.size(); i++) {
-                    if (state.self.building_types[i] == Building::TypeCastle) {
-                        castle_position = state.self.building_positions[i];
-                        break;
+                // Keep the castle_position that was set when we built the castle
+                // Don't reset it to 0 as the building list extraction is not yet implemented
+                if (castle_position == 0) {
+                    // Fallback: try to find castle position from building list
+                    for (size_t i = 0; i < state.self.building_positions.size(); i++) {
+                        if (state.self.building_types[i] == Building::TypeCastle) {
+                            castle_position = state.self.building_positions[i];
+                            break;
+                        }
                     }
                 }
             }

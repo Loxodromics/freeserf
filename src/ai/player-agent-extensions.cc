@@ -1,6 +1,7 @@
 #include "player-agent-extensions.h"
 #include "agent-integration.h"
 #include "ai-logger.h"
+#include "scripted-agent.h"
 #include <unordered_map>
 #include <chrono>
 
@@ -53,8 +54,15 @@ void update_agent_player(Player* player, Game* game, uint16_t tick_delta) {
         // 1. Capture current game state
         GameState game_state = AgentIntegration::capture_game_state(game, player);
         
-        // 2. Get actions from agent
-        std::vector<AIAction> actions = agent->get_actions(game_state);
+        // 2. Get actions from agent (try enhanced version first)
+        std::vector<AIAction> actions;
+        if (auto scripted_agent = dynamic_cast<ScriptedAgent*>(agent)) {
+            // Use enhanced version with Game/Player access for ScriptedAgent
+            actions = scripted_agent->get_actions(game_state, game, player);
+        } else {
+            // Fallback to standard version for other agents
+            actions = agent->get_actions(game_state);
+        }
         
         // 3. Validate and execute actions
         int actions_executed = 0;
