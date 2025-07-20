@@ -7,7 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 FreeSerf is a C++ implementation of the classic strategy game Settlers, using CMake as the build system. The project is structured with multiple static libraries and follows the Google C++ Style Guide.
 
 ## Workflow
-After you implemented a step from @work-logs/phase0.3.md, compile and run the program, if that works, update @work-logs/phase0.3.md to reflect the current state and check it in your changes.
+FreeSerf AI Agent API development is tracked in work-logs. Phase 0.3 (Action Execution Framework) is now COMPLETE ✅. 
+
+**Current Status**: Functional AI agents can play FreeSerf with complete observe-decide-act cycles.
 
 ## Build Commands
 
@@ -149,3 +151,42 @@ Requires original game data files:
 - Amiga: `gfxheader`, `gfxfast`, `gfxchip`, `gfxpics`, `sounds`, `music`
 
 Place data files in same directory as executable or `~/.local/share/freeserf/`
+
+## AI Agent System
+
+### AI Testing Commands
+```bash
+# Test with 1 AI player (note: Player0 is reserved for human control)
+./FreeSerf -a -p 2
+
+# Test with 2 AI players
+./FreeSerf -a -p 3
+
+# Test with 3 AI players  
+./FreeSerf -a -p 4
+
+# Enable AI debug logging
+./FreeSerf -a -p 2   # -a enables debug logging, -p 2 creates 1 functional AI player
+```
+
+### AI Player Indexing
+**Important**: Player0 is hardcoded as the human player in FreeSerf's UI system.
+- `-p 1` = 0 functional AI players (Player0 is human-controlled)
+- `-p 2` = 1 functional AI player (Player1)
+- `-p 3` = 2 functional AI players (Player1, Player2)
+- `-p 4` = 3 functional AI players (Player1, Player2, Player3)
+
+### AI System Status
+- **Phase 0.3 COMPLETE** ✅: Action Execution Framework
+  - Action validation using existing game APIs
+  - Action execution with performance monitoring
+  - ScriptedAgent with state machine decision-making
+  - Complete observe-decide-act cycle operational
+  - Enhanced debug logging for full AI observability
+
+### AI Architecture
+- **Agent Integration** (`src/ai/agent-integration.h/.cc`): Core AI system interface
+- **ScriptedAgent** (`src/ai/scripted-agent.h/.cc`): Functional AI player implementation
+- **Action System** (`src/ai/ai-action.h`): AI action definitions and validation
+- **Logging System** (`src/ai/ai-logger.h/.cc`): Comprehensive AI debug logging
+- **Player Extensions** (`src/ai/player-agent-extensions.h/.cc`): Player-AI integration
