@@ -46,6 +46,7 @@ public:
     
     // Debug utilities
     static void log_debug_info(int player_id, const std::string& message);
+    static void log_debug(const std::string& message);  // General debug logging
     static void log_error(int player_id, const std::string& error_message);
 
 private:

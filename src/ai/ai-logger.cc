@@ -173,6 +173,12 @@ void AILogger::log_debug_info(int player_id, const std::string& message) {
     Log::Debug["ai"] << "[AI-DEBUG] " << get_player_prefix(player_id) << ": " << message;
 }
 
+void AILogger::log_debug(const std::string& message) {
+    if (!debug_enabled) return;
+    
+    Log::Debug["ai"] << "[AI-DEBUG] " << message;
+}
+
 void AILogger::log_error(int player_id, const std::string& error_message) {
     // Always log errors, regardless of debug setting
     Log::Error["ai"] << "[AI-ERROR] " << get_player_prefix(player_id) << ": " << error_message;

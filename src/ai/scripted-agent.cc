@@ -1,5 +1,7 @@
 #include "scripted-agent.h"
 #include "ai-logger.h"
+#include "../game.h"
+#include "../player.h"
 #include <algorithm>
 #include <cmath>
 #include <random>
@@ -179,44 +181,153 @@ std::vector<AIAction> ScriptedAgent::decide_expansion_phase(const GameState& sta
 }
 
 // Position finding algorithms
-MapPos ScriptedAgent::find_best_castle_position(const GameState& state) {
+MapPos ScriptedAgent::find_best_castle_position(const GameState& state, Game* game, Player* player) {
     const auto& map = state.map;
     
-    // Look for a position that's:
-    // 1. Not too close to edges
-    // 2. On suitable terrain
-    // 3. Has some nearby resources
+    // Use authoritative game validation when available
+    if (game != nullptr && player != nullptr) {
+        return find_castle_position_with_game_validation(state, game, player);
+    }
     
-    int best_score = -1;
-    MapPos best_pos = 0;
+    // Fallback to simplified validation (legacy behavior)
+    return find_castle_position_fallback(state);
+}
+
+// NEW: Authoritative castle position finding using game validation
+MapPos ScriptedAgent::find_castle_position_with_game_validation(const GameState& state, Game* game, Player* player) {
+    const auto& map = state.map;
     
-    for (int y = 10; y < map.height - 10; y += 2) {
-        for (int x = 10; x < map.width - 10; x += 2) {
-            MapPos pos = y * map.width + x;
+    AILogger::log_debug("Castle search: Using authoritative game validation");
+    AILogger::log_debug("Map: " + std::to_string(map.width) + "x" + std::to_string(map.height) + 
+                       " (" + std::to_string(map.terrain_types.size()) + " positions)");
+    
+    // Calculate map center for center-outward search
+    int center_x = map.width / 2;
+    int center_y = map.height / 2;
+    int max_radius = std::min(map.width, map.height) / 2 - 5; // Stay away from edges
+    
+    int positions_tested = 0;
+    
+    // Center-outward spiral search for efficiency
+    for (int radius = 5; radius <= max_radius; radius += 3) {
+        AILogger::log_debug("Testing radius " + std::to_string(radius));
+        
+        // Test positions in a circle around center
+        for (int angle = 0; angle < 360; angle += 30) { // Every 30 degrees
+            double rad = angle * 3.14159 / 180.0;
+            int x = center_x + static_cast<int>(radius * std::cos(rad));
+            int y = center_y + static_cast<int>(radius * std::sin(rad));
             
-            if (is_position_suitable_for_castle(pos, state)) {
-                int score = 100;  // Base score
-                
-                // Prefer positions with nearby trees
-                score += count_trees_near(pos, state, 5) * 2;
-                
-                // Prefer positions not too close to water
-                // Add small randomization based on personality
-                score += (personality % 3) * 10;
-                
-                if (score > best_score) {
-                    best_score = score;
-                    best_pos = pos;
-                }
+            // Bounds check
+            if (x < 5 || x >= map.width - 5 || y < 5 || y >= map.height - 5) {
+                continue;
             }
+            
+            // Use safe coordinate calculation
+            size_t actual_map_size = map.terrain_types.size();
+            int safe_width = static_cast<int>(std::sqrt(actual_map_size));
+            MapPos pos = y * safe_width + x;
+            
+            if (pos >= actual_map_size) continue;
+            
+            positions_tested++;
+            
+            // Use authoritative game validation - no AI guessing!
+            if (game->can_build_castle(pos, player)) {
+                AILogger::log_debug("Castle found: pos=" + std::to_string(pos) + 
+                                   " (" + std::to_string(x) + "," + std::to_string(y) + 
+                                   ") radius=" + std::to_string(radius) + 
+                                   " tested=" + std::to_string(positions_tested));
+                return pos; // Return first valid position - no need to find "best"
+            }
+        }
+        
+        // Early termination if we've tested many positions
+        if (positions_tested > 100) {
+            AILogger::log_debug("Tested " + std::to_string(positions_tested) + " positions, expanding search...");
+            break;
         }
     }
     
-    return best_pos;
+    // If spiral search failed, try a more systematic approach
+    AILogger::log_debug("Spiral search failed, trying systematic search...");
+    
+    size_t actual_map_size = map.terrain_types.size();
+    int safe_width = static_cast<int>(std::sqrt(actual_map_size));
+    
+    for (int y = 5; y < safe_width - 5; y += 4) {
+        for (int x = 5; x < safe_width - 5; x += 4) {
+            MapPos pos = y * safe_width + x;
+            
+            if (pos >= actual_map_size) continue;
+            
+            positions_tested++;
+            
+            if (game->can_build_castle(pos, player)) {
+                AILogger::log_debug("Castle found (systematic): pos=" + std::to_string(pos) + 
+                                   " (" + std::to_string(x) + "," + std::to_string(y) + 
+                                   ") tested=" + std::to_string(positions_tested));
+                return pos;
+            }
+            
+            // Prevent excessive search time
+            if (positions_tested > 500) {
+                break;
+            }
+        }
+        if (positions_tested > 500) break;
+    }
+    
+    AILogger::log_debug("Castle search failed: tested " + std::to_string(positions_tested) + " positions");
+    return 0; // No valid position found
+}
+
+// LEGACY: Fallback method using simplified validation (for compatibility)
+MapPos ScriptedAgent::find_castle_position_fallback(const GameState& state) {
+    const auto& map = state.map;
+    
+    AILogger::log_debug("Castle search: Using fallback validation (simplified)");
+    
+    size_t actual_map_size = map.terrain_types.size();
+    if (actual_map_size == 0) {
+        AILogger::log_debug("ERROR: Terrain vector is empty");
+        return 0;
+    }
+    
+    int safe_width = static_cast<int>(std::sqrt(actual_map_size));
+    int positions_tested = 0;
+    
+    // Simple grid search as fallback
+    for (int y = 10; y < safe_width - 10; y += 4) {
+        for (int x = 10; x < safe_width - 10; x += 4) {
+            MapPos pos = y * safe_width + x;
+            positions_tested++;
+            
+            if (pos >= actual_map_size) continue;
+            
+            if (is_position_suitable_for_castle(pos, state)) {
+                AILogger::log_debug("Castle found (fallback): pos=" + std::to_string(pos) + 
+                                   " tested=" + std::to_string(positions_tested));
+                return pos;
+            }
+            
+            if (positions_tested > 100) break; // Limit search time
+        }
+        if (positions_tested > 100) break;
+    }
+    
+    AILogger::log_debug("Fallback castle search failed: tested " + std::to_string(positions_tested) + " positions");
+    return 0;
 }
 
 MapPos ScriptedAgent::find_forest_position_near(MapPos center, const GameState& state) {
     const auto& map = state.map;
+    
+    // Use safe dimensions like in castle position finding
+    size_t actual_map_size = map.terrain_types.size();
+    if (actual_map_size == 0) return 0;
+    
+    int safe_width = static_cast<int>(std::sqrt(actual_map_size));
     
     // Search in expanding radius around center
     for (int radius = 2; radius <= 10; radius++) {
@@ -224,12 +335,15 @@ MapPos ScriptedAgent::find_forest_position_near(MapPos center, const GameState& 
             for (int dx = -radius; dx <= radius; dx++) {
                 if (dx * dx + dy * dy > radius * radius) continue;
                 
-                int x = (center % map.width) + dx;
-                int y = (center / map.width) + dy;
+                int x = (center % safe_width) + dx;
+                int y = (center / safe_width) + dy;
                 
-                if (x < 0 || x >= map.width || y < 0 || y >= map.height) continue;
+                if (x < 0 || x >= safe_width || y < 0 || y >= safe_width) continue;
                 
-                MapPos pos = y * map.width + x;
+                MapPos pos = y * safe_width + x;
+                
+                // Bounds check
+                if (pos >= actual_map_size) continue;
                 
                 if (is_position_suitable_for_building(pos, state)) {
                     // Good location if it has trees nearby
@@ -247,18 +361,27 @@ MapPos ScriptedAgent::find_forest_position_near(MapPos center, const GameState& 
 MapPos ScriptedAgent::find_building_position_near(MapPos center, const GameState& state) {
     const auto& map = state.map;
     
+    // Use safe dimensions
+    size_t actual_map_size = map.terrain_types.size();
+    if (actual_map_size == 0) return 0;
+    
+    int safe_width = static_cast<int>(std::sqrt(actual_map_size));
+    
     // Search in expanding radius around center
     for (int radius = 2; radius <= 8; radius++) {
         for (int dy = -radius; dy <= radius; dy++) {
             for (int dx = -radius; dx <= radius; dx++) {
                 if (dx * dx + dy * dy > radius * radius) continue;
                 
-                int x = (center % map.width) + dx;
-                int y = (center / map.width) + dy;
+                int x = (center % safe_width) + dx;
+                int y = (center / safe_width) + dy;
                 
-                if (x < 0 || x >= map.width || y < 0 || y >= map.height) continue;
+                if (x < 0 || x >= safe_width || y < 0 || y >= safe_width) continue;
                 
-                MapPos pos = y * map.width + x;
+                MapPos pos = y * safe_width + x;
+                
+                // Bounds check
+                if (pos >= actual_map_size) continue;
                 
                 if (is_position_suitable_for_building(pos, state)) {
                     return pos;
@@ -285,16 +408,77 @@ bool ScriptedAgent::is_position_suitable_for_castle(MapPos pos, const GameState&
     const auto& map = state.map;
     
     // Check if position is within map bounds
-    if (pos >= map.terrain_types.size()) return false;
+    if (pos >= map.terrain_types.size()) {
+        AILogger::log_debug("Castle pos " + std::to_string(pos) + " FAIL: exceeds map bounds (max: " + 
+                           std::to_string(map.terrain_types.size()) + ")");
+        return false;
+    }
     
     // Check if position already has building
-    if (map.has_building[pos]) return false;
+    if (map.has_building[pos]) {
+        AILogger::log_debug("Castle pos " + std::to_string(pos) + " FAIL: already has building");
+        return false;
+    }
+    
+    // Check if position has flag
+    if (map.has_flag[pos]) {
+        AILogger::log_debug("Castle pos " + std::to_string(pos) + " FAIL: already has flag");
+        return false;
+    }
+    
+    // Check ownership - for castle, position should be unowned
+    if (map.ownership[pos] != 255) {  // 255 typically means unowned
+        AILogger::log_debug("Castle pos " + std::to_string(pos) + " FAIL: owned by player " + 
+                           std::to_string(map.ownership[pos]));
+        return false;
+    }
     
     // Check terrain type (simplified check)
     uint8_t terrain = map.terrain_types[pos];
+    if (terrain >= 8) {  // Avoid water and very steep terrain
+        AILogger::log_debug("Castle pos " + std::to_string(pos) + " FAIL: unsuitable terrain type " + 
+                           std::to_string(terrain));
+        return false;
+    }
     
-    // Avoid water and very steep terrain (basic heuristic)
-    return terrain < 8;  // Simplified terrain check
+    // Check that we're not too close to water or other obstacles
+    int x = pos % map.width;
+    int y = pos / map.width;
+    
+    // Basic check of surrounding positions (simplified spiral check)
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            if (dx == 0 && dy == 0) continue;
+            
+            int check_x = x + dx;
+            int check_y = y + dy;
+            
+            if (check_x < 0 || check_x >= map.width || check_y < 0 || check_y >= map.height) {
+                continue;  // Out of bounds, skip
+            }
+            
+            MapPos check_pos = check_y * map.width + check_x;
+            if (check_pos >= map.terrain_types.size()) continue;
+            
+            // Check if adjacent position is already owned
+            if (map.ownership[check_pos] != 255) {
+                AILogger::log_debug("Castle pos " + std::to_string(pos) + " FAIL: adjacent position " + 
+                                   std::to_string(check_pos) + " is owned");
+                return false;
+            }
+            
+            // Check if adjacent position has building
+            if (map.has_building[check_pos]) {
+                AILogger::log_debug("Castle pos " + std::to_string(pos) + " FAIL: adjacent position " + 
+                                   std::to_string(check_pos) + " has building");
+                return false;
+            }
+        }
+    }
+    
+    AILogger::log_debug("Castle pos " + std::to_string(pos) + " PASS: all checks passed, terrain=" + 
+                       std::to_string(terrain));
+    return true;
 }
 
 bool ScriptedAgent::is_position_suitable_for_building(MapPos pos, const GameState& state) {
@@ -320,8 +504,14 @@ int ScriptedAgent::count_trees_near(MapPos pos, const GameState& state, int radi
     const auto& map = state.map;
     int tree_count = 0;
     
-    int x_center = pos % map.width;
-    int y_center = pos / map.width;
+    // Use safe dimensions
+    size_t actual_map_size = map.terrain_types.size();
+    if (actual_map_size == 0) return 0;
+    
+    int safe_width = static_cast<int>(std::sqrt(actual_map_size));
+    
+    int x_center = pos % safe_width;
+    int y_center = pos / safe_width;
     
     for (int dy = -radius; dy <= radius; dy++) {
         for (int dx = -radius; dx <= radius; dx++) {
@@ -330,9 +520,12 @@ int ScriptedAgent::count_trees_near(MapPos pos, const GameState& state, int radi
             int x = x_center + dx;
             int y = y_center + dy;
             
-            if (x < 0 || x >= map.width || y < 0 || y >= map.height) continue;
+            if (x < 0 || x >= safe_width || y < 0 || y >= safe_width) continue;
             
-            MapPos check_pos = y * map.width + x;
+            MapPos check_pos = y * safe_width + x;
+            
+            // Bounds check
+            if (check_pos >= actual_map_size) continue;
             
             // Check terrain type for trees (simplified)
             uint8_t terrain = map.terrain_types[check_pos];

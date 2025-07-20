@@ -108,6 +108,12 @@ void AgentIntegration::extract_map_info(GameState::MapInfo& map_info, const Game
     map_info.width = map->get_cols();
     map_info.height = map->get_rows();
     
+    // Debug: Log actual map dimensions and size
+    AILogger::log_debug("Map extraction: cols=" + std::to_string(map_info.width) + 
+                       ", rows=" + std::to_string(map_info.height));
+    AILogger::log_debug("Map size (get_size): " + std::to_string(map->get_size()));
+    AILogger::log_debug("Calculated size (width*height): " + std::to_string(map_info.width * map_info.height));
+    
     size_t map_size = map_info.width * map_info.height;
     
     // Initialize map data vectors
@@ -204,12 +210,77 @@ AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::vali
 AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_build_castle(
     MapPos pos, const Game* game, const Player* player) {
     
-    // Use existing game validation method
-    if (!const_cast<Game*>(game)->can_build_castle(pos, player)) {
-        return {false, "Cannot build castle at position", ActionError::INVALID_POSITION, 1.0f};
+    Game* mutable_game = const_cast<Game*>(game);
+    Player* mutable_player = const_cast<Player*>(player);
+    
+    // Check if player already has a castle
+    if (player->has_castle()) {
+        return {false, "Player already has a castle", ActionError::INVALID_POSITION, 0.0f};
     }
     
-    return {true, "Castle placement valid", ActionError::SUCCESS, 1.0f};
+    // First, try the AI's suggested position with authoritative validation
+    if (mutable_game->can_build_castle(pos, player)) {
+        AILogger::log_debug("Castle validation: AI position " + std::to_string(pos) + " is valid");
+        return {true, "Castle placement valid", ActionError::SUCCESS, 1.0f};
+    }
+    
+    // AI's position failed - use smart position finding to find a valid alternative
+    AILogger::log_debug("Castle validation: AI position " + std::to_string(pos) + " invalid, searching for alternative...");
+    
+    MapPos alternative_pos = find_valid_castle_position_nearby(pos, mutable_game, mutable_player);
+    
+    if (alternative_pos != 0) {
+        AILogger::log_debug("Castle validation: Found alternative position " + std::to_string(alternative_pos));
+        return {true, "Castle placement valid (corrected position)", ActionError::SUCCESS, 1.0f, alternative_pos};
+    }
+    
+    // No valid position found
+    AILogger::log_debug("Castle validation: No valid castle position found");
+    return {false, "No valid castle position available", ActionError::INVALID_POSITION, 0.0f};
+}
+
+// Helper method to find valid castle position near the AI's suggestion
+MapPos AgentIntegration::ActionValidator::find_valid_castle_position_nearby(MapPos suggested_pos, Game* game, Player* player) {
+    auto map = game->get_map();
+    int map_cols = map->get_cols();
+    int map_rows = map->get_rows();
+    
+    // Convert suggested position to coordinates for center-outward search
+    int center_x = suggested_pos % map_cols;
+    int center_y = suggested_pos / map_cols;
+    
+    int positions_tested = 0;
+    const int max_positions = 150; // Limit search to stay within performance budget
+    
+    // Search in expanding radius around the AI's suggested position
+    for (int radius = 1; radius <= 20 && positions_tested < max_positions; radius += 2) {
+        // Test positions in a circle around the suggested position
+        for (int angle = 0; angle < 360 && positions_tested < max_positions; angle += 45) {
+            double rad = angle * 3.14159 / 180.0;
+            int x = center_x + static_cast<int>(radius * std::cos(rad));
+            int y = center_y + static_cast<int>(radius * std::sin(rad));
+            
+            // Bounds check
+            if (x < 5 || x >= map_cols - 5 || y < 5 || y >= map_rows - 5) {
+                continue;
+            }
+            
+            MapPos test_pos = y * map_cols + x;
+            positions_tested++;
+            
+            // Use authoritative game validation
+            if (game->can_build_castle(test_pos, player)) {
+                AILogger::log_debug("Found valid castle position: " + std::to_string(test_pos) + 
+                                   " (" + std::to_string(x) + "," + std::to_string(y) + 
+                                   ") radius=" + std::to_string(radius) + 
+                                   " tested=" + std::to_string(positions_tested));
+                return test_pos;
+            }
+        }
+    }
+    
+    AILogger::log_debug("No valid castle position found after testing " + std::to_string(positions_tested) + " positions");
+    return 0; // No valid position found
 }
 
 AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_build_flag(

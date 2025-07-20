@@ -48,6 +48,11 @@ public:
         std::string failure_reason;
         ActionError error_code;
         float confidence;  // 0.0-1.0, confidence in the validation result
+        MapPos corrected_position = 0;  // Alternative position if original was invalid
+        
+        // Constructors for convenience
+        ActionValidationResult(bool valid, const std::string& reason, ActionError err, float conf, MapPos corrected = 0)
+            : is_valid(valid), failure_reason(reason), error_code(err), confidence(conf), corrected_position(corrected) {}
     };
     
     class ActionValidator {
@@ -57,6 +62,10 @@ public:
         static ActionValidationResult validate_build_flag(MapPos pos, const Game* game, const Player* player);
         static ActionValidationResult validate_build_road(MapPos from, MapPos to, const Game* game, const Player* player);
         static ActionValidationResult validate_build_building(MapPos pos, Building::Type type, const Game* game, const Player* player);
+        
+    private:
+        // Helper method for smart castle position finding
+        static MapPos find_valid_castle_position_nearby(MapPos suggested_pos, Game* game, Player* player);
     };
     
     // Action execution

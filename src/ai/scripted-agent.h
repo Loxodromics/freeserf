@@ -6,6 +6,10 @@
 #include <vector>
 #include <string>
 
+// Forward declarations
+class Game;
+class Player;
+
 /**
  * ScriptedAgent - A functional AI agent that replaces MockAgent
  * Implements basic decision-making for Phase 1 actions with a simple state machine
@@ -64,10 +68,14 @@ private:
     std::vector<AIAction> decide_expansion_phase(const GameState& state);
     
     // Position finding algorithms
-    MapPos find_best_castle_position(const GameState& state);
+    MapPos find_best_castle_position(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     MapPos find_forest_position_near(MapPos center, const GameState& state);
     MapPos find_building_position_near(MapPos center, const GameState& state);
     std::vector<MapPos> plan_road_between(MapPos from, MapPos to, const GameState& state);
+    
+    // Castle position finding helpers
+    MapPos find_castle_position_with_game_validation(const GameState& state, Game* game, Player* player);
+    MapPos find_castle_position_fallback(const GameState& state);
     
     // Helper methods
     bool has_building_at(MapPos pos, const GameState& state);

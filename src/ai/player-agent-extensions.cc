@@ -65,8 +65,16 @@ void update_agent_player(Player* player, Game* game, uint16_t tick_delta) {
                 AILogger::log_action_validation(player_id, action, validation.is_valid, validation.failure_reason);
                 
                 if (validation.is_valid) {
-                    // Execute action
-                    std::vector<AgentIntegration::ActionResult> results = AgentIntegration::execute_actions({action}, game, player);
+                    // Use corrected position if validation provided one
+                    AIAction final_action = action;
+                    if (validation.corrected_position != 0) {
+                        final_action.primary_position = validation.corrected_position;
+                        AILogger::log_debug_info(player_id, "Using corrected position " + std::to_string(validation.corrected_position) + 
+                                                 " instead of " + std::to_string(action.primary_position));
+                    }
+                    
+                    // Execute action (potentially with corrected position)
+                    std::vector<AgentIntegration::ActionResult> results = AgentIntegration::execute_actions({final_action}, game, player);
                     
                     if (!results.empty()) {
                         const auto& result = results[0];
