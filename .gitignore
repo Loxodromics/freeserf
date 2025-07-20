@@ -47,3 +47,7 @@ cmake-build-*/
 
 # work logs
 work-logs/
+
+# IDEs and stuff
+.idea
+.claude
