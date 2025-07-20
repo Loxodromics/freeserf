@@ -52,4 +52,14 @@ public:
     static void agent_player_update(Player* player, Game* game, uint16_t tick_delta);
     static void agent_game_started(const Game* game);
     static void agent_game_ended(const Game* game, bool victory);
+    
+    // AI player setup
+    static void setup_ai_players(int ai_count);
+
+private:
+    // Helper functions for game state extraction
+    static void extract_player_state(GameState::PlayerState& player_state, 
+                                    const Player* player, const Game* game);
+    static void extract_map_info(GameState::MapInfo& map_info, const Game* game);
+    static void extract_global_info(GameState::GlobalInfo& global_info, const Game* game);
 };

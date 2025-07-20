@@ -33,6 +33,8 @@
 #include "src/game-manager.h"
 #include "src/command_line.h"
 #include "src/video-sdl.h"
+#include "src/ai/ai-logger.h"
+#include "src/ai/agent-integration.h"
 
 #ifdef WIN32
 # include "src/sdl_compat.h"
@@ -46,6 +48,10 @@ main(int argc, char *argv[]) {
   unsigned int screen_width = 0;
   unsigned int screen_height = 0;
   bool fullscreen = false;
+  
+  // AI configuration
+  bool ai_debug_mode = false;
+  int ai_player_count = 0;
 
   CommandLine command_line;
   command_line.add_option('d', "Set Debug output level")
@@ -81,6 +87,18 @@ main(int argc, char *argv[]) {
                   s >> screen_height;
                   return true;
                 });
+  
+  // AI options
+  command_line.add_option('a', "Enable AI debug logging",
+                          [&ai_debug_mode](){ ai_debug_mode = true; });
+  command_line.add_option('p', "Set number of AI players (1-4)")
+                .add_parameter("NUM", [&ai_player_count](std::istream& s) {
+                  s >> ai_player_count;
+                  if (ai_player_count < 0) ai_player_count = 0;
+                  if (ai_player_count > 4) ai_player_count = 4;
+                  return true;
+                });
+  
   command_line.set_comment("Please report bugs to <" PACKAGE_BUGREPORT ">");
   if (!command_line.process(argc, argv)) {
     return EXIT_FAILURE;
@@ -117,6 +135,18 @@ main(int argc, char *argv[]) {
   } else {
     if (!game_manager.start_random_game()) {
       return EXIT_FAILURE;
+    }
+  }
+  
+  // Configure AI system if requested
+  if (ai_debug_mode || ai_player_count > 0) {
+    AILogger::set_debug_enabled(ai_debug_mode);
+    
+    if (ai_player_count > 0) {
+      AgentIntegration::setup_ai_players(ai_player_count);
+      AILogger::log_game_started(ai_player_count);
+      Log::Info["main"] << "AI system initialized with " << ai_player_count 
+                        << " AI players, debug=" << (ai_debug_mode ? "ON" : "OFF");
     }
   }
 

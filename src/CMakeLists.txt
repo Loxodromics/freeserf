@@ -62,6 +62,7 @@ set(GAME_SOURCES building.cc
                  ai/agent-factory.cc
                  ai/agent-integration.cc
                  ai/player-agent-extensions.cc
+                 ai/ai-logger.cc
                  ai/test/mock-agent.cc)
 
 set(GAME_HEADERS building.h
@@ -85,6 +86,7 @@ set(GAME_HEADERS building.h
                  ai/agent-factory.h
                  ai/agent-integration.h
                  ai/player-agent-extensions.h
+                 ai/ai-logger.h
                  ai/test/mock-agent.h)
 
 add_library(game STATIC ${GAME_SOURCES} ${GAME_HEADERS})

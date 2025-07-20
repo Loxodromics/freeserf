@@ -1,5 +1,8 @@
 #include "player-agent-extensions.h"
+#include "agent-integration.h"
+#include "ai-logger.h"
 #include <unordered_map>
+#include <chrono>
 
 // TODO: In Phase 0.4, this will be replaced with proper Player class extension
 // For now, use a global map to associate agents with players
@@ -41,12 +44,53 @@ void update_agent_player(Player* player, Game* game, uint16_t tick_delta) {
         return;
     }
     
-    // TODO: Implement full agent update cycle in Phase 0.4
-    // This would include:
-    // 1. Capture game state
-    // 2. Get actions from agent
-    // 3. Execute actions
-    // 4. Provide feedback/rewards
+    // Performance timing
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    int player_id = player->get_index();
+    
+    try {
+        // 1. Capture current game state
+        GameState game_state = AgentIntegration::capture_game_state(game, player);
+        
+        // 2. Get actions from agent
+        std::vector<AIAction> actions = agent->get_actions(game_state);
+        
+        // 3. Log and execute actions
+        int actions_executed = 0;
+        for (const auto& action : actions) {
+            if (action.type != AIActionType::NO_ACTION) {
+                AILogger::log_action_taken(player_id, action);
+                
+                // TODO: Implement actual action execution in Phase 0.3
+                // For now, just log the action as successful
+                AILogger::log_action_result(player_id, action, true, "Action logged (execution not yet implemented)", 1.0f);
+                actions_executed++;
+            }
+        }
+        
+        // 4. Log periodic game state summary (every 50 ticks)
+        static uint32_t last_summary_tick = 0;
+        if (game_state.game_tick - last_summary_tick >= 50) {
+            AILogger::log_game_state_summary(game_state, player_id);
+            last_summary_tick = game_state.game_tick;
+        }
+        
+        // 5. Performance monitoring
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        float execution_time_ms = duration.count() / 1000.0f;
+        
+        bool budget_exceeded = execution_time_ms > 3.0f; // 3ms budget
+        AILogger::log_performance_metrics(player_id, execution_time_ms, actions_executed, budget_exceeded);
+        
+        if (budget_exceeded) {
+            AILogger::log_debug_info(player_id, "AI execution time exceeded budget!");
+        }
+        
+    } catch (const std::exception& e) {
+        AILogger::log_error(player_id, std::string("Agent update failed: ") + e.what());
+    }
 }
 
 }

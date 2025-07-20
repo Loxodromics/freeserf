@@ -28,6 +28,7 @@
 #include "src/inventory.h"
 #include "src/savegame.h"
 #include "src/building.h"
+#include "src/ai/player-agent-extensions.h"
 
 Player::Player(Game* game, unsigned int index)
   : GameObject(game, index)
@@ -878,6 +879,9 @@ Player::update() {
   if (is_ai()) {
     /*if (player->field_1B2 != 0) player->field_1B2 -= 1;*/
     /*if (player->field_1B0 != 0) player->field_1B0 -= 1;*/
+    
+    // Agent integration point - call AI system if agent is attached
+    PlayerAgentExtensions::update_agent_player(this, game, delta);
   }
 
   if (cycling_knight()) {
