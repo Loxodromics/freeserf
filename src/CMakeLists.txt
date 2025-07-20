@@ -58,7 +58,11 @@ set(GAME_SOURCES building.cc
                  random.cc
                  savegame.cc
                  serf.cc
-                 game-manager.cc)
+                 game-manager.cc
+                 ai/agent-factory.cc
+                 ai/agent-integration.cc
+                 ai/player-agent-extensions.cc
+                 ai/test/mock-agent.cc)
 
 set(GAME_HEADERS building.h
                  flag.h
@@ -74,7 +78,14 @@ set(GAME_HEADERS building.h
                  resource.h
                  savegame.h
                  serf.h
-                 game-manager.h)
+                 game-manager.h
+                 ai/agent.h
+                 ai/game-state.h
+                 ai/ai-action.h
+                 ai/agent-factory.h
+                 ai/agent-integration.h
+                 ai/player-agent-extensions.h
+                 ai/test/mock-agent.h)
 
 add_library(game STATIC ${GAME_SOURCES} ${GAME_HEADERS})
 target_check_style(game)
