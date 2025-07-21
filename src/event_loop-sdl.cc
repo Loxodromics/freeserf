@@ -20,6 +20,8 @@
  */
 
 #include "src/event_loop-sdl.h"
+#include "src/event_loop-dummy.h"
+#include "src/headless.h"
 
 #include "src/log.h"
 #include "src/gfx.h"
@@ -28,8 +30,13 @@
 
 EventLoop &
 EventLoop::get_instance() {
-  static EventLoopSDL event_loop;
-  return event_loop;
+  if (g_headless_mode) {
+    static EventLoopDummy dummy_event_loop;
+    return dummy_event_loop;
+  } else {
+    static EventLoopSDL event_loop;
+    return event_loop;
+  }
 }
 
 /* How fast consequtive mouse events need to be generated
@@ -394,5 +401,9 @@ class TimerSDL : public Timer {
 Timer *
 Timer::create(unsigned int _id, unsigned int _interval,
               Timer::Handler *_handler) {
-  return new TimerSDL(_id, _interval, _handler);
+  if (g_headless_mode) {
+    return new TimerDummy(_id, _interval, _handler);
+  } else {
+    return new TimerSDL(_id, _interval, _handler);
+  }
 }

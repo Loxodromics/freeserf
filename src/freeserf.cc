@@ -36,10 +36,15 @@
 #include "src/ai/ai-logger.h"
 #include "src/ai/agent-integration.h"
 #include "src/mission.h"
+#include "src/headless.h"
+#include "src/headless-handler.h"
 
 #ifdef WIN32
 # include "src/sdl_compat.h"
 #endif  // WIN32
+
+// Global headless mode flag
+bool g_headless_mode = false;
 
 // Helper function to start a game with pre-configured AI players
 bool start_game_with_ai_players(int ai_player_count, bool ai_debug_mode) {
@@ -93,6 +98,7 @@ main(int argc, char *argv[]) {
   // AI configuration
   bool ai_debug_mode = false;
   int ai_player_count = 0;
+  bool headless_mode = false;
 
   CommandLine command_line;
   command_line.add_option('d', "Set Debug output level")
@@ -141,13 +147,23 @@ main(int argc, char *argv[]) {
                   if (ai_player_count > 4) ai_player_count = 4;
                   return true;
                 });
+  command_line.add_option('H', "Run in headless mode (no graphics)",
+                          [&headless_mode](){ headless_mode = true; });
   
   command_line.set_comment("Please report bugs to <" PACKAGE_BUGREPORT ">");
   if (!command_line.process(argc, argv)) {
     return EXIT_FAILURE;
   }
 
-  Log::Info["main"] << "freeserf " << FREESERF_VERSION;
+  // Set global headless mode flag
+  g_headless_mode = headless_mode;
+  
+  if (headless_mode) {
+    Log::Info["main"] << "freeserf " << FREESERF_VERSION << " (headless mode)";
+    Log::Info["main"] << "Graphics and audio disabled for simulation-only execution";
+  } else {
+    Log::Info["main"] << "freeserf " << FREESERF_VERSION;
+  }
 
 
   Data &data = Data::get_instance();
@@ -156,28 +172,36 @@ main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  Log::Info["main"] << "Initialize graphics...";
+  if (!headless_mode) {
+    Log::Info["main"] << "Initialize graphics...";
+  }
 
+  // Graphics initialization - skipped in headless mode but we still need the instance
+  // for some code paths that expect it (will use dummy video implementation)
   Graphics &gfx = Graphics::get_instance();
 
-  /* TODO move to right place */
-  Audio &audio = Audio::get_instance();
-  if (!mute_audio) {
-    Audio::PPlayer player = audio.get_music_player();
-    if (player) {
-      Audio::PTrack t = player->play_track(Audio::TypeMidiTrack0);
+  /* Initialize audio (skip in headless mode) */
+  if (!headless_mode) {
+    Audio &audio = Audio::get_instance();
+    if (!mute_audio) {
+      Audio::PPlayer player = audio.get_music_player();
+      if (player) {
+        Audio::PTrack t = player->play_track(Audio::TypeMidiTrack0);
+      }
+    } else {
+      // Disable audio players when muted
+      Audio::PPlayer sound_player = audio.get_sound_player();
+      Audio::PPlayer music_player = audio.get_music_player();
+      if (sound_player) {
+        sound_player->enable(false);
+      }
+      if (music_player) {
+        music_player->enable(false);
+      }
+      Log::Info["main"] << "Audio disabled (mute mode)";
     }
   } else {
-    // Disable audio players when muted
-    Audio::PPlayer sound_player = audio.get_sound_player();
-    Audio::PPlayer music_player = audio.get_music_player();
-    if (sound_player) {
-      sound_player->enable(false);
-    }
-    if (music_player) {
-      music_player->enable(false);
-    }
-    Log::Info["main"] << "Audio disabled (mute mode)";
+    Log::Info["main"] << "Audio disabled (headless mode)";
   }
 
   /* Either load a save game if specified or
@@ -212,26 +236,41 @@ main(int argc, char *argv[]) {
     }
   }
 
-  /* Initialize interface */
-  Interface interface;
-  if ((screen_width == 0) || (screen_height == 0)) {
-    gfx.get_resolution(&screen_width, &screen_height);
+  /* Initialize interface (skip in headless mode) */
+  if (!headless_mode) {
+    Interface interface;
+    if ((screen_width == 0) || (screen_height == 0)) {
+      gfx.get_resolution(&screen_width, &screen_height);
+    }
+    interface.set_size(screen_width, screen_height);
+    interface.set_displayed(true);
+
+    if (save_file.empty() && ai_player_count == 0) {
+      interface.open_game_init();
+    }
+
+    /* Init game loop */
+    EventLoop &event_loop = EventLoop::get_instance();
+    event_loop.add_handler(&interface);
+
+    /* Start game loop */
+    event_loop.run();
+
+    event_loop.del_handler(&interface);
+  } else {
+    /* Headless mode - run game loop with minimal handler */
+    Log::Info["main"] << "Starting headless simulation...";
+    
+    HeadlessHandler headless_handler;
+    
+    EventLoop &event_loop = EventLoop::get_instance();
+    event_loop.add_handler(&headless_handler);
+    
+    /* Start game loop */
+    event_loop.run();
+    
+    event_loop.del_handler(&headless_handler);
   }
-  interface.set_size(screen_width, screen_height);
-  interface.set_displayed(true);
-
-  if (save_file.empty() && ai_player_count == 0) {
-    interface.open_game_init();
-  }
-
-  /* Init game loop */
-  EventLoop &event_loop = EventLoop::get_instance();
-  event_loop.add_handler(&interface);
-
-  /* Start game loop */
-  event_loop.run();
-
-  event_loop.del_handler(&interface);
 
   Log::Info["main"] << "Cleaning up...";
 

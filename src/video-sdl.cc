@@ -20,6 +20,8 @@
  */
 
 #include "src/video-sdl.h"
+#include "src/video-dummy.h"
+#include "src/headless.h"
 
 #include <sstream>
 
@@ -154,8 +156,13 @@ VideoSDL::~VideoSDL() {
 
 Video &
 Video::get_instance() {
-  static VideoSDL instance;
-  return instance;
+  if (g_headless_mode) {
+    static VideoDummy dummy_instance;
+    return dummy_instance;
+  } else {
+    static VideoSDL instance;
+    return instance;
+  }
 }
 
 

@@ -7,7 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 FreeSerf is a C++ implementation of the classic strategy game Settlers, using CMake as the build system. The project is structured with multiple static libraries and follows the Google C++ Style Guide.
 
 ## Workflow
-FreeSerf AI Agent API development is tracked in work-logs. Phase 0.3 (Action Execution Framework) is now COMPLETE ✅. 
+* Write your planes into a file in the work-logs directory. Update your plan file after each step to reflect the current state. 
+* Your plan should include regularly compiling and running the program.
+* Use the AI log to see if your implementation actually works, that's what we have added it for. You plan needs to include theses test executed by you. Remember to filter the log or  pipe it to a file, since it gets ver long quickly.
+* Use `timeout` for testing and killing the program. 
 
 **Current Status**: Functional AI agents can play FreeSerf with complete observe-decide-act cycles.
 
@@ -57,27 +60,6 @@ mkdir build
 conan install . --output-folder=build --build=missing
 cd build
 cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON
-ninja
-
-# Run tests
-ninja test
-
-# Check code style
-ninja check_style
-```
-
-### SDL2 Build (legacy)
-```bash
-# Traditional Build with SDL2
-mkdir build && cd build
-cmake -G Ninja -DUSE_SDL3=OFF ..
-ninja
-
-# Conan 2 Build with SDL2 (when needed)
-mkdir build
-conan install . --output-folder=build --build=missing -o use_sdl3=False
-cd build
-cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=OFF
 ninja
 
 # Run tests
@@ -165,6 +147,9 @@ Place data files in same directory as executable or `~/.local/share/freeserf/`
 # Run in fullscreen
 ./FreeSerf -f
 
+# Run in headless mode (no graphics/audio - for AI training)
+./FreeSerf -H
+
 # Set custom resolution
 ./FreeSerf -r 1024x768
 
@@ -181,6 +166,11 @@ Place data files in same directory as executable or `~/.local/share/freeserf/`
 ./FreeSerf -a -p 2   # Test with 1 AI player (Player0 is human)
 ./FreeSerf -a -p 3   # Test with 2 AI players
 ./FreeSerf -a -p 4   # Test with 3 AI players
+
+# Headless AI Training (recommended for ML/training)
+./FreeSerf -H -a -p 2   # Headless mode with 1 AI player
+./FreeSerf -H -a -p 3   # Headless mode with 2 AI players
+timeout 30s ./FreeSerf -H -a -p 2   # 30-second headless simulation
 
 # Combined options (muted AI game)
 ./FreeSerf -m -a -p 2
@@ -204,9 +194,39 @@ Place data files in same directory as executable or `~/.local/share/freeserf/`
   - Multi-player AI coordination verified (multiple AI players building simultaneously)
   - Building limits implemented (no infinite forester loops)
 
+- **Phase 0.7 COMPLETE** ✅: Headless Mode for AI Training
+  - Full headless mode implementation with `-H` flag
+  - Zero graphics/audio overhead - pure simulation engine
+  - Identical AI behavior to windowed mode (deterministic)
+  - Perfect for ML training environments and server deployment
+  - Parallel training capability (multiple instances without conflicts)
+  - HeadlessHandler drives game simulation without Interface dependency
+  - Factory pattern for SDL vs headless video/event loop selection
+
 ### AI Architecture
 - **Agent Integration** (`src/ai/agent-integration.h/.cc`): Core AI system interface
 - **ScriptedAgent** (`src/ai/scripted-agent.h/.cc`): Functional AI player implementation
 - **Action System** (`src/ai/ai-action.h`): AI action definitions and validation
 - **Logging System** (`src/ai/ai-logger.h/.cc`): Comprehensive AI debug logging
 - **Player Extensions** (`src/ai/player-agent-extensions.h/.cc`): Player-AI integration
+
+### Headless Mode Architecture
+- **HeadlessHandler** (`src/headless-handler.h/.cc`): Minimal event handler for simulation-only mode
+- **Dummy Video** (`src/video-dummy.h/.cc`): Stub video implementation (no rendering)
+- **Dummy Event Loop** (`src/event_loop-dummy.h/.cc`): Timer-based event loop without SDL
+- **Factory Pattern**: Conditional instantiation based on global `g_headless_mode` flag
+- **Zero Dependencies**: No SDL window, renderer, or audio systems in headless mode
+
+### Headless Mode Usage
+```bash
+# AI Log Monitoring (filter long output)
+./FreeSerf -H -a -p 2 | grep -E "(AI-EXECUTE|AI-STATE)" > ai-actions.log
+
+# Performance Testing
+timeout 60s ./FreeSerf -H -a -p 3 > simulation.log 2>&1
+
+# Parallel Training (multiple instances)
+./FreeSerf -H -a -p 2 &  # Instance 1
+./FreeSerf -H -a -p 2 &  # Instance 2
+./FreeSerf -H -a -p 2 &  # Instance 3
+```

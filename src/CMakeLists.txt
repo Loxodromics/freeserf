@@ -107,8 +107,8 @@ set(PLATFORM_HEADERS video.h
                      audio.h
                      event_loop.h)
 
-list(APPEND PLATFORM_SOURCES video-sdl.cc event_loop-sdl.cc)
-list(APPEND PLATFORM_HEADERS video-sdl.h event_loop-sdl.h)
+list(APPEND PLATFORM_SOURCES video-sdl.cc event_loop-sdl.cc video-dummy.cc event_loop-dummy.cc)
+list(APPEND PLATFORM_HEADERS video-sdl.h event_loop-sdl.h video-dummy.h event_loop-dummy.h)
 
 if(ENABLE_SDL_MIXER)
   list(APPEND PLATFORM_SOURCES audio-sdlmixer.cc)
@@ -199,7 +199,8 @@ set(OTHER_SOURCES pathfinder.cc
                   version.cc
                   text-input.cc
                   list.cc
-                  command_line.cc)
+                  command_line.cc
+                  headless-handler.cc)
 
 set(OTHER_HEADERS pathfinder.h
                   gfx.h
@@ -217,7 +218,9 @@ set(OTHER_HEADERS pathfinder.h
                   text-input.h
                   list.h
                   convertor.h
-                  command_line.h)
+                  command_line.h
+                  headless.h
+                  headless-handler.h)
 
 set(FREESERF_SOURCES freeserf.cc ${OTHER_SOURCES})
 set(FREESERF_HEADERS freeserf.h ${OTHER_HEADERS})
