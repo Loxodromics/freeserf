@@ -65,7 +65,7 @@ private:
     std::vector<AIAction> decide_castle_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<AIAction> decide_forester_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<AIAction> decide_lumberjack_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
-    std::vector<AIAction> decide_road_construction(const GameState& state);
+    std::vector<AIAction> decide_road_construction(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<AIAction> decide_flag_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<AIAction> decide_production_phase(const GameState& state);
     std::vector<AIAction> decide_expansion_phase(const GameState& state);
@@ -88,6 +88,9 @@ private:
     
     // Flag position finding helpers
     MapPos find_flag_position_near(MapPos building_pos, const GameState& state, Game* game = nullptr, Player* player = nullptr);
+    MapPos find_castle_flag_position(const GameState& state, Game* game = nullptr, Player* player = nullptr);
+    MapPos find_building_flag_position(Building::Type type, const GameState& state, Game* game = nullptr, Player* player = nullptr);
+    bool road_exists_between(MapPos flag1, MapPos flag2, const GameState& state, Game* game = nullptr, Player* player = nullptr);
     
     // Helper methods
     bool has_building_at(MapPos pos, const GameState& state);

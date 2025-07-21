@@ -52,7 +52,7 @@ std::vector<AIAction> ScriptedAgent::get_actions(const GameState& state, Game* g
             break;
             
         case AgentState::NEED_ROADS:
-            actions = decide_flag_placement(state, game, player);
+            actions = decide_road_construction(state, game, player);
             break;
             
         case AgentState::PRODUCING:
@@ -192,21 +192,40 @@ std::vector<AIAction> ScriptedAgent::decide_flag_placement(const GameState& stat
     return {AIAction::no_action()};
 }
 
-std::vector<AIAction> ScriptedAgent::decide_road_construction(const GameState& state) {
-    // Simple road construction: connect buildings to castle
-    std::vector<MapPos> buildings;
+std::vector<AIAction> ScriptedAgent::decide_road_construction(const GameState& state, Game* game, Player* player) {
+    AILogger::log_debug("Road construction: starting road building phase");
     
-    if (forester_position != 0) buildings.push_back(forester_position);
-    if (lumberjack_position != 0) buildings.push_back(lumberjack_position);
+    // Find castle flag position
+    MapPos castle_flag = find_castle_flag_position(state, game, player);
+    if (castle_flag == 0) {
+        AILogger::log_debug("Road construction: castle flag not found, cannot build roads");
+        return {AIAction::no_action()};
+    }
     
-    // Try to build road from castle to the nearest building without road
-    for (MapPos building_pos : buildings) {
-        if (building_pos != castle_position) {
-            AIAction action = AIAction::build_road(castle_position, building_pos, 0.6f);
+    // Try to build roads from each building to castle (priority: forester first)
+    
+    // 1. Connect forester to castle
+    if (forester_position != 0) {
+        MapPos forester_flag = find_building_flag_position(Building::TypeForester, state, game, player);
+        if (forester_flag != 0 && !road_exists_between(forester_flag, castle_flag, state, game, player)) {
+            AILogger::log_debug("Road construction: building road forester_flag(" + std::to_string(forester_flag) + ") -> castle_flag(" + std::to_string(castle_flag) + ")");
+            AIAction action = AIAction::build_road(forester_flag, castle_flag, 0.9f);
             return {action};
         }
     }
     
+    // 2. Connect lumberjack to castle
+    if (lumberjack_position != 0) {
+        MapPos lumberjack_flag = find_building_flag_position(Building::TypeLumberjack, state, game, player);
+        if (lumberjack_flag != 0 && !road_exists_between(lumberjack_flag, castle_flag, state, game, player)) {
+            AILogger::log_debug("Road construction: building road lumberjack_flag(" + std::to_string(lumberjack_flag) + ") -> castle_flag(" + std::to_string(castle_flag) + ")");
+            AIAction action = AIAction::build_road(lumberjack_flag, castle_flag, 0.9f);
+            return {action};
+        }
+    }
+    
+    // All roads built or no buildings found
+    AILogger::log_debug("Road construction: all roads complete, transitioning to production");
     return {AIAction::no_action()};
 }
 
@@ -608,6 +627,101 @@ MapPos ScriptedAgent::find_flag_position_near(MapPos building_pos, const GameSta
     // Fallback for when Game/Player not available
     AILogger::log_debug("Flag search: using fallback (no game validation)");
     return 0;
+}
+
+MapPos ScriptedAgent::find_castle_flag_position(const GameState& state, Game* game, Player* player) {
+    AILogger::log_debug("Castle flag search: looking for castle flag position");
+    
+    if (game != nullptr && castle_position != 0) {
+        // Find castle building at stored position
+        auto game_map = game->get_map();
+        if (game_map->has_building(castle_position)) {
+            // Get building from game
+            Building* building = game->get_building_at_pos(castle_position);
+            if (building && building->get_type() == Building::TypeCastle && building->get_owner() == player->get_index()) {
+                unsigned int flag_index = building->get_flag_index();
+                if (flag_index != 0) {
+                    Flag* flag = game->get_flag(flag_index);
+                    if (flag) {
+                        MapPos flag_pos = flag->get_position();
+                        AILogger::log_debug("Castle flag found at position " + std::to_string(flag_pos));
+                        return flag_pos;
+                    }
+                }
+            }
+        }
+    }
+    
+    AILogger::log_debug("Castle flag search failed");
+    return 0;
+}
+
+MapPos ScriptedAgent::find_building_flag_position(Building::Type type, const GameState& state, Game* game, Player* player) {
+    AILogger::log_debug("Building flag search: looking for " + std::to_string(type) + " flag position");
+    
+    if (game != nullptr && player != nullptr) {
+        MapPos building_pos = 0;
+        
+        // Get the stored position for the building type
+        switch (type) {
+            case Building::TypeForester:
+                building_pos = forester_position;
+                break;
+            case Building::TypeLumberjack:
+                building_pos = lumberjack_position;
+                break;
+            default:
+                AILogger::log_debug("Building flag search: unsupported building type " + std::to_string(type));
+                return 0;
+        }
+        
+        if (building_pos != 0) {
+            auto game_map = game->get_map();
+            if (game_map->has_building(building_pos)) {
+                Building* building = game->get_building_at_pos(building_pos);
+                if (building && building->get_type() == type && building->get_owner() == player->get_index()) {
+                    unsigned int flag_index = building->get_flag_index();
+                    if (flag_index != 0) {
+                        Flag* flag = game->get_flag(flag_index);
+                        if (flag) {
+                            MapPos flag_pos = flag->get_position();
+                            AILogger::log_debug("Building flag found at position " + std::to_string(flag_pos) + " for type " + std::to_string(type));
+                            return flag_pos;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    AILogger::log_debug("Building flag search failed for type " + std::to_string(type));
+    return 0;
+}
+
+bool ScriptedAgent::road_exists_between(MapPos flag1, MapPos flag2, const GameState& state, Game* game, Player* player) {
+    AILogger::log_debug("Road existence check: " + std::to_string(flag1) + " <-> " + std::to_string(flag2));
+    
+    if (game != nullptr && flag1 != 0 && flag2 != 0 && flag1 != flag2) {
+        // Get flags directly by position
+        Flag* flag1_obj = game->get_flag_at_pos(flag1);
+        Flag* flag2_obj = game->get_flag_at_pos(flag2);
+        
+        if (flag1_obj && flag2_obj) {
+            // Check if flag1 has any paths that lead to flag2
+            for (int dir = 0; dir < 6; dir++) {
+                if (flag1_obj->has_path(static_cast<Direction>(dir))) {
+                    Flag* connected_flag = flag1_obj->get_other_end_flag(static_cast<Direction>(dir));
+                    if (connected_flag && connected_flag->get_position() == flag2) {
+                        AILogger::log_debug("Road exists: direct connection found");
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    
+    AILogger::log_debug("Road existence check: no road found");
+    return false;
 }
 
 std::vector<MapPos> ScriptedAgent::plan_road_between(MapPos from, MapPos to, const GameState& state) {
