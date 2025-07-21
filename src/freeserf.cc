@@ -88,6 +88,7 @@ main(int argc, char *argv[]) {
   unsigned int screen_width = 0;
   unsigned int screen_height = 0;
   bool fullscreen = false;
+  bool mute_audio = false;
   
   // AI configuration
   bool ai_debug_mode = false;
@@ -119,6 +120,8 @@ main(int argc, char *argv[]) {
                   std::getline(s, save_file);
                   return true;
                 });
+  command_line.add_option('m', "Disable all audio (mute)",
+                          [&mute_audio](){ mute_audio = true; });
   command_line.add_option('r', "Set display resolution (e.g. 800x600)")
                 .add_parameter("RES",
                               [&screen_width, &screen_height](std::istream& s) {
@@ -159,9 +162,22 @@ main(int argc, char *argv[]) {
 
   /* TODO move to right place */
   Audio &audio = Audio::get_instance();
-  Audio::PPlayer player = audio.get_music_player();
-  if (player) {
-    Audio::PTrack t = player->play_track(Audio::TypeMidiTrack0);
+  if (!mute_audio) {
+    Audio::PPlayer player = audio.get_music_player();
+    if (player) {
+      Audio::PTrack t = player->play_track(Audio::TypeMidiTrack0);
+    }
+  } else {
+    // Disable audio players when muted
+    Audio::PPlayer sound_player = audio.get_sound_player();
+    Audio::PPlayer music_player = audio.get_music_player();
+    if (sound_player) {
+      sound_player->enable(false);
+    }
+    if (music_player) {
+      music_player->enable(false);
+    }
+    Log::Info["main"] << "Audio disabled (mute mode)";
   }
 
   /* Either load a save game if specified or

@@ -154,19 +154,36 @@ Place data files in same directory as executable or `~/.local/share/freeserf/`
 
 ## AI Agent System
 
-### AI Testing Commands
+### Command Line Options
 ```bash
-# Test with 1 AI player (note: Player0 is reserved for human control)
-./FreeSerf -a -p 2
+# Basic game execution
+./FreeSerf
 
-# Test with 2 AI players
-./FreeSerf -a -p 3
+# Disable all audio (mute)
+./FreeSerf -m
 
-# Test with 3 AI players  
-./FreeSerf -a -p 4
+# Run in fullscreen
+./FreeSerf -f
 
-# Enable AI debug logging
-./FreeSerf -a -p 2   # -a enables debug logging, -p 2 creates 1 functional AI player
+# Set custom resolution
+./FreeSerf -r 1024x768
+
+# Load saved game
+./FreeSerf -l savefile.save
+
+# Set debug level (0-4)
+./FreeSerf -d 2
+
+# Use custom data directory
+./FreeSerf -g /path/to/data
+
+# AI Testing Commands
+./FreeSerf -a -p 2   # Test with 1 AI player (Player0 is human)
+./FreeSerf -a -p 3   # Test with 2 AI players
+./FreeSerf -a -p 4   # Test with 3 AI players
+
+# Combined options (muted AI game)
+./FreeSerf -m -a -p 2
 ```
 
 ### AI Player Indexing
