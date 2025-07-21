@@ -177,12 +177,15 @@ Place data files in same directory as executable or `~/.local/share/freeserf/`
 - `-p 4` = 3 functional AI players (Player1, Player2, Player3)
 
 ### AI System Status
-- **Phase 0.3 COMPLETE** ✅: Action Execution Framework
-  - Action validation using existing game APIs
-  - Action execution with performance monitoring
-  - ScriptedAgent with state machine decision-making
-  - Complete observe-decide-act cycle operational
-  - Enhanced debug logging for full AI observability
+- **Phase 0.3 COMPLETE** ✅: Action Execution Framework & Building Sequence
+  - Action validation using authoritative game APIs (Game::can_build_castle, can_build_building, can_build_flag)
+  - Action execution with sub-millisecond performance monitoring
+  - ScriptedAgent with state machine decision-making (NEED_CASTLE → NEED_FORESTER → NEED_LUMBERJACK → NEED_ROADS → PRODUCING → EXPANDING)
+  - Complete observe-decide-act cycle operational with building sequence: BUILD_CASTLE + BUILD_FORESTER + BUILD_LUMBERJACK + BUILD_FLAG
+  - Building detection system counting both completed and incomplete buildings (fixes construction site issue)
+  - Enhanced debug logging for full AI observability and performance tracking
+  - Multi-player AI coordination verified (multiple AI players building simultaneously)
+  - Building limits implemented (no infinite forester loops)
 
 ### AI Architecture
 - **Agent Integration** (`src/ai/agent-integration.h/.cc`): Core AI system interface

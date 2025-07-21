@@ -62,9 +62,17 @@ void AgentIntegration::extract_player_state(GameState::PlayerState& player_state
         player_state.resource_priorities[i] = player->get_inventory_prio(i);
     }
     
-    // Extract building counts (24 building types)
+    // Extract building counts (24 building types) - include both completed and under construction
     for (int i = 0; i < 24; ++i) {
-        player_state.building_counts[i] = player->get_completed_building_count(i);
+        int completed = player->get_completed_building_count(i);
+        int incomplete = player->get_incomplete_building_count(i);
+        player_state.building_counts[i] = completed + incomplete;  // Total buildings (completed + under construction)
+        
+        // Debug logging for key building types
+        if (i == Building::TypeForester || i == Building::TypeLumberjack || i == Building::TypeCastle) {
+            AILogger::log_debug("Building type " + std::to_string(i) + ": completed=" + std::to_string(completed) + 
+                               ", incomplete=" + std::to_string(incomplete) + ", total=" + std::to_string(player_state.building_counts[i]));
+        }
     }
     
     // Military information

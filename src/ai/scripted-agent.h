@@ -66,6 +66,7 @@ private:
     std::vector<AIAction> decide_forester_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<AIAction> decide_lumberjack_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<AIAction> decide_road_construction(const GameState& state);
+    std::vector<AIAction> decide_flag_placement(const GameState& state, Game* game = nullptr, Player* player = nullptr);
     std::vector<AIAction> decide_production_phase(const GameState& state);
     std::vector<AIAction> decide_expansion_phase(const GameState& state);
     
@@ -84,6 +85,9 @@ private:
     MapPos find_forest_position_fallback(MapPos center, const GameState& state);
     MapPos find_building_position_with_game_validation(MapPos center, const GameState& state, Building::Type type, Game* game, Player* player);
     MapPos find_building_position_fallback(MapPos center, const GameState& state);
+    
+    // Flag position finding helpers
+    MapPos find_flag_position_near(MapPos building_pos, const GameState& state, Game* game = nullptr, Player* player = nullptr);
     
     // Helper methods
     bool has_building_at(MapPos pos, const GameState& state);

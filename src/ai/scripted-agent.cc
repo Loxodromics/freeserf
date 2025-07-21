@@ -52,7 +52,7 @@ std::vector<AIAction> ScriptedAgent::get_actions(const GameState& state, Game* g
             break;
             
         case AgentState::NEED_ROADS:
-            actions = decide_road_construction(state);
+            actions = decide_flag_placement(state, game, player);
             break;
             
         case AgentState::PRODUCING:
@@ -121,8 +121,12 @@ std::vector<AIAction> ScriptedAgent::decide_castle_placement(const GameState& st
 }
 
 std::vector<AIAction> ScriptedAgent::decide_forester_placement(const GameState& state, Game* game, Player* player) {
-    // Check if we already have a forester
-    if (state.self.building_counts[static_cast<int>(Building::TypeForester)] > 0) {
+    // Check if we already have a forester (completed + under construction)
+    int forester_count = state.self.building_counts[static_cast<int>(Building::TypeForester)];
+    AILogger::log_debug("Forester decision: current count = " + std::to_string(forester_count));
+    
+    if (forester_count > 0) {
+        AILogger::log_debug("Forester decision: already have " + std::to_string(forester_count) + " foresters, skipping");
         return {AIAction::no_action()};
     }
     
@@ -137,8 +141,12 @@ std::vector<AIAction> ScriptedAgent::decide_forester_placement(const GameState& 
 }
 
 std::vector<AIAction> ScriptedAgent::decide_lumberjack_placement(const GameState& state, Game* game, Player* player) {
-    // Check if we already have a lumberjack
-    if (state.self.building_counts[static_cast<int>(Building::TypeLumberjack)] > 0) {
+    // Check if we already have a lumberjack (completed + under construction)
+    int lumberjack_count = state.self.building_counts[static_cast<int>(Building::TypeLumberjack)];
+    AILogger::log_debug("Lumberjack decision: current count = " + std::to_string(lumberjack_count));
+    
+    if (lumberjack_count > 0) {
+        AILogger::log_debug("Lumberjack decision: already have " + std::to_string(lumberjack_count) + " lumberjacks, skipping");
         return {AIAction::no_action()};
     }
     
@@ -152,6 +160,35 @@ std::vector<AIAction> ScriptedAgent::decide_lumberjack_placement(const GameState
         return {action};
     }
     
+    return {AIAction::no_action()};
+}
+
+std::vector<AIAction> ScriptedAgent::decide_flag_placement(const GameState& state, Game* game, Player* player) {
+    AILogger::log_debug("Flag placement: checking buildings for flag needs");
+    
+    // Strategy: Place flags near buildings that don't have them yet
+    // Priority order: castle -> forester -> lumberjack
+    
+    std::vector<std::pair<MapPos, std::string>> buildings_to_check;
+    if (castle_position != 0) buildings_to_check.push_back({castle_position, "castle"});
+    if (forester_position != 0) buildings_to_check.push_back({forester_position, "forester"});
+    if (lumberjack_position != 0) buildings_to_check.push_back({lumberjack_position, "lumberjack"});
+    
+    for (const auto& building : buildings_to_check) {
+        MapPos building_pos = building.first;
+        const std::string& building_name = building.second;
+        
+        AILogger::log_debug("Flag placement: checking " + building_name + " at position " + std::to_string(building_pos));
+        
+        MapPos flag_pos = find_flag_position_near(building_pos, state, game, player);
+        if (flag_pos != 0) {
+            AILogger::log_debug("Flag placement: found position " + std::to_string(flag_pos) + " near " + building_name);
+            AIAction action = AIAction::build_flag(flag_pos, 0.5f);
+            return {action};
+        }
+    }
+    
+    AILogger::log_debug("Flag placement: no suitable flag positions found, transitioning to production");
     return {AIAction::no_action()};
 }
 
@@ -522,6 +559,57 @@ MapPos ScriptedAgent::find_building_position_fallback(MapPos center, const GameS
     return 0;  // No suitable position found
 }
 
+MapPos ScriptedAgent::find_flag_position_near(MapPos building_pos, const GameState& state, Game* game, Player* player) {
+    AILogger::log_debug("Flag search: finding position near building " + std::to_string(building_pos));
+    
+    // Use authoritative validation when available
+    if (game != nullptr && player != nullptr) {
+        auto game_map = game->get_map();
+        int map_cols = game_map->get_cols();
+        int map_rows = game_map->get_rows();
+        
+        // Convert building position to coordinates
+        int building_x = building_pos % map_cols;
+        int building_y = building_pos / map_cols;
+        
+        int positions_tested = 0;
+        const int max_positions = 40; // Limit search for performance
+        
+        // Search in expanding radius around building (flags should be close)
+        for (int radius = 1; radius <= 5 && positions_tested < max_positions; radius++) {
+            for (int angle = 0; angle < 360 && positions_tested < max_positions; angle += 60) {
+                double rad = angle * 3.14159 / 180.0;
+                int x = building_x + static_cast<int>(radius * std::cos(rad));
+                int y = building_y + static_cast<int>(radius * std::sin(rad));
+                
+                // Bounds check
+                if (x < 1 || x >= map_cols - 1 || y < 1 || y >= map_rows - 1) {
+                    continue;
+                }
+                
+                MapPos pos = y * map_cols + x;
+                positions_tested++;
+                
+                // Use authoritative game validation for flag
+                if (game->can_build_flag(pos, player)) {
+                    AILogger::log_debug("Flag found: pos=" + std::to_string(pos) + 
+                                       " (" + std::to_string(x) + "," + std::to_string(y) + 
+                                       ") radius=" + std::to_string(radius) + 
+                                       " tested=" + std::to_string(positions_tested));
+                    return pos;
+                }
+            }
+        }
+        
+        AILogger::log_debug("Flag search failed: tested " + std::to_string(positions_tested) + " positions");
+        return 0; // No valid position found
+    }
+    
+    // Fallback for when Game/Player not available
+    AILogger::log_debug("Flag search: using fallback (no game validation)");
+    return 0;
+}
+
 std::vector<MapPos> ScriptedAgent::plan_road_between(MapPos from, MapPos to, const GameState& state) {
     // Simple road planning - just return direct connection
     // A more sophisticated implementation would use pathfinding
@@ -721,8 +809,9 @@ void ScriptedAgent::update_agent_state(const GameState& state) {
             break;
             
         case AgentState::NEED_ROADS:
-            // Transition to producing after some time or when basic infrastructure is connected
-            if (state.game_tick > 500) {  // After some time
+            // Transition to producing after some time or when we've placed some flags
+            // Simple heuristic: if we have spent some time in this state, move on
+            if (state.game_tick > 300) {  // After some time building flags
                 current_state = AgentState::PRODUCING;
             }
             break;
