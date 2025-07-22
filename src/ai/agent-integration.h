@@ -89,6 +89,8 @@ public:
         static ActionResult execute_build_road(const AIAction& action, Game* game, Player* player);
         static ActionResult execute_build_lumberjack(const AIAction& action, Game* game, Player* player);
         static ActionResult execute_build_forester(const AIAction& action, Game* game, Player* player);
+        static ActionResult execute_build_building_generic(const AIAction& action, Building::Type building_type, Game* game, Player* player);
+        static float calculate_building_reward(Building::Type type);
         static ActionResult create_success_result(const std::string& message, float reward, std::chrono::microseconds exec_time);
         static ActionResult create_failure_result(const std::string& message, ActionError error, std::chrono::microseconds exec_time);
     };

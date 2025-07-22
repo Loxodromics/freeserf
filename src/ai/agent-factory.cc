@@ -1,6 +1,7 @@
 #include "agent-factory.h"
 #include "test/mock-agent.h"
 #include "scripted-agent.h"
+#include "random-agent.h"
 #include <stdexcept>
 
 std::unique_ptr<Agent> AgentFactory::create_agent(const AgentConfig& config) {
@@ -15,6 +16,9 @@ std::unique_ptr<Agent> AgentFactory::create_agent(const AgentConfig& config) {
         case AgentType::HUMAN_ASSISTED:
             // TODO: Implement HumanAssistedAgent in future phases
             throw std::runtime_error("HumanAssistedAgent not yet implemented");
+            
+        case AgentType::RANDOM:
+            return std::make_unique<RandomAgent>(config.name);
             
         default:
             throw std::runtime_error("Unknown agent type");
@@ -32,6 +36,13 @@ std::unique_ptr<Agent> AgentFactory::create_neural_agent(const std::string& mode
                                                         const std::string& name) {
     // For Phase 0, return MockAgent as placeholder
     return std::make_unique<MockAgent>(name);
+}
+
+std::unique_ptr<Agent> AgentFactory::create_random_agent(const std::string& name) {
+    AgentConfig config;
+    config.type = AgentType::RANDOM;
+    config.name = name;
+    return create_agent(config);
 }
 
 void AgentFactory::register_agent_type(AgentType type, 
@@ -52,6 +63,8 @@ std::string AgentFactory::get_agent_type_name(AgentType type) {
             return "Neural Network";
         case AgentType::HUMAN_ASSISTED:
             return "Human Assisted";
+        case AgentType::RANDOM:
+            return "Random";
         default:
             return "Unknown";
     }

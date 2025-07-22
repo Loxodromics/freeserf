@@ -13,7 +13,8 @@ class Game;
 enum class AgentType {
     SCRIPTED,
     NEURAL_NETWORK,
-    HUMAN_ASSISTED
+    HUMAN_ASSISTED,
+    RANDOM
 };
 
 /**

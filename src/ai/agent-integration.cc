@@ -206,6 +206,50 @@ AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::vali
         case AIActionType::BUILD_FORESTER:
             return validate_build_building(action.primary_position, Building::TypeForester, game, player);
             
+        // Phase 0.8.1 New Building Validations
+        case AIActionType::BUILD_FISHER:
+            return validate_build_building(action.primary_position, Building::TypeFisher, game, player);
+        case AIActionType::BUILD_BOATBUILDER:
+            return validate_build_building(action.primary_position, Building::TypeBoatbuilder, game, player);
+        case AIActionType::BUILD_STONECUTTER:
+            return validate_build_building(action.primary_position, Building::TypeStonecutter, game, player);
+        case AIActionType::BUILD_STONE_MINE:
+            return validate_build_building(action.primary_position, Building::TypeStoneMine, game, player);
+        case AIActionType::BUILD_COAL_MINE:
+            return validate_build_building(action.primary_position, Building::TypeCoalMine, game, player);
+        case AIActionType::BUILD_IRON_MINE:
+            return validate_build_building(action.primary_position, Building::TypeIronMine, game, player);
+        case AIActionType::BUILD_GOLD_MINE:
+            return validate_build_building(action.primary_position, Building::TypeGoldMine, game, player);
+        case AIActionType::BUILD_STOCK:
+            return validate_build_building(action.primary_position, Building::TypeStock, game, player);
+        case AIActionType::BUILD_HUT:
+            return validate_build_building(action.primary_position, Building::TypeHut, game, player);
+        case AIActionType::BUILD_FARM:
+            return validate_build_building(action.primary_position, Building::TypeFarm, game, player);
+        case AIActionType::BUILD_BUTCHER:
+            return validate_build_building(action.primary_position, Building::TypeButcher, game, player);
+        case AIActionType::BUILD_PIG_FARM:
+            return validate_build_building(action.primary_position, Building::TypePigFarm, game, player);
+        case AIActionType::BUILD_MILL:
+            return validate_build_building(action.primary_position, Building::TypeMill, game, player);
+        case AIActionType::BUILD_BAKER:
+            return validate_build_building(action.primary_position, Building::TypeBaker, game, player);
+        case AIActionType::BUILD_SAWMILL:
+            return validate_build_building(action.primary_position, Building::TypeSawmill, game, player);
+        case AIActionType::BUILD_STEEL_SMELTER:
+            return validate_build_building(action.primary_position, Building::TypeSteelSmelter, game, player);
+        case AIActionType::BUILD_TOOL_MAKER:
+            return validate_build_building(action.primary_position, Building::TypeToolMaker, game, player);
+        case AIActionType::BUILD_WEAPON_SMITH:
+            return validate_build_building(action.primary_position, Building::TypeWeaponSmith, game, player);
+        case AIActionType::BUILD_TOWER:
+            return validate_build_building(action.primary_position, Building::TypeTower, game, player);
+        case AIActionType::BUILD_FORTRESS:
+            return validate_build_building(action.primary_position, Building::TypeFortress, game, player);
+        case AIActionType::BUILD_GOLD_SMELTER:
+            return validate_build_building(action.primary_position, Building::TypeGoldSmelter, game, player);
+            
         case AIActionType::NO_ACTION:
         case AIActionType::WAIT:
             return {true, "No action or wait - always valid", ActionError::SUCCESS, 1.0f};
@@ -430,6 +474,71 @@ std::vector<AgentIntegration::ActionResult> AgentIntegration::ActionExecutor::ex
                 result = execute_build_forester(action, game, player);
                 break;
                 
+            // Phase 0.8.1 New Building Executions
+            case AIActionType::BUILD_FISHER:
+                result = execute_build_building_generic(action, Building::TypeFisher, game, player);
+                break;
+            case AIActionType::BUILD_BOATBUILDER:
+                result = execute_build_building_generic(action, Building::TypeBoatbuilder, game, player);
+                break;
+            case AIActionType::BUILD_STONECUTTER:
+                result = execute_build_building_generic(action, Building::TypeStonecutter, game, player);
+                break;
+            case AIActionType::BUILD_STONE_MINE:
+                result = execute_build_building_generic(action, Building::TypeStoneMine, game, player);
+                break;
+            case AIActionType::BUILD_COAL_MINE:
+                result = execute_build_building_generic(action, Building::TypeCoalMine, game, player);
+                break;
+            case AIActionType::BUILD_IRON_MINE:
+                result = execute_build_building_generic(action, Building::TypeIronMine, game, player);
+                break;
+            case AIActionType::BUILD_GOLD_MINE:
+                result = execute_build_building_generic(action, Building::TypeGoldMine, game, player);
+                break;
+            case AIActionType::BUILD_STOCK:
+                result = execute_build_building_generic(action, Building::TypeStock, game, player);
+                break;
+            case AIActionType::BUILD_HUT:
+                result = execute_build_building_generic(action, Building::TypeHut, game, player);
+                break;
+            case AIActionType::BUILD_FARM:
+                result = execute_build_building_generic(action, Building::TypeFarm, game, player);
+                break;
+            case AIActionType::BUILD_BUTCHER:
+                result = execute_build_building_generic(action, Building::TypeButcher, game, player);
+                break;
+            case AIActionType::BUILD_PIG_FARM:
+                result = execute_build_building_generic(action, Building::TypePigFarm, game, player);
+                break;
+            case AIActionType::BUILD_MILL:
+                result = execute_build_building_generic(action, Building::TypeMill, game, player);
+                break;
+            case AIActionType::BUILD_BAKER:
+                result = execute_build_building_generic(action, Building::TypeBaker, game, player);
+                break;
+            case AIActionType::BUILD_SAWMILL:
+                result = execute_build_building_generic(action, Building::TypeSawmill, game, player);
+                break;
+            case AIActionType::BUILD_STEEL_SMELTER:
+                result = execute_build_building_generic(action, Building::TypeSteelSmelter, game, player);
+                break;
+            case AIActionType::BUILD_TOOL_MAKER:
+                result = execute_build_building_generic(action, Building::TypeToolMaker, game, player);
+                break;
+            case AIActionType::BUILD_WEAPON_SMITH:
+                result = execute_build_building_generic(action, Building::TypeWeaponSmith, game, player);
+                break;
+            case AIActionType::BUILD_TOWER:
+                result = execute_build_building_generic(action, Building::TypeTower, game, player);
+                break;
+            case AIActionType::BUILD_FORTRESS:
+                result = execute_build_building_generic(action, Building::TypeFortress, game, player);
+                break;
+            case AIActionType::BUILD_GOLD_SMELTER:
+                result = execute_build_building_generic(action, Building::TypeGoldSmelter, game, player);
+                break;
+                
             case AIActionType::NO_ACTION:
             case AIActionType::WAIT:
                 {
@@ -623,6 +732,88 @@ std::vector<AgentIntegration::ActionResult> AgentIntegration::execute_actions(
     return ActionExecutor::execute_actions(actions, game, player);
 }
 
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_build_building_generic(
+    const AIAction& action, Building::Type building_type, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Validate first
+    auto validation = ActionValidator::validate_build_building(action.primary_position, building_type, game, player);
+    if (!validation.is_valid) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result(validation.failure_reason, validation.error_code, duration);
+    }
+    
+    // Execute using existing game method
+    if (game->build_building(action.primary_position, building_type, player)) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        float reward = calculate_building_reward(building_type);
+        std::string success_message = "Building " + std::to_string(static_cast<int>(building_type)) + " built successfully";
+        return create_success_result(success_message, reward, duration);
+    } else {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        std::string failure_message = "Failed to build building " + std::to_string(static_cast<int>(building_type));
+        return create_failure_result(failure_message, ActionError::GAME_ENGINE_ERROR, duration);
+    }
+}
+
+float AgentIntegration::ActionExecutor::calculate_building_reward(Building::Type type) {
+    switch (type) {
+        // Basic production
+        case Building::TypeFisher:
+        case Building::TypeFarm:
+        case Building::TypeButcher:
+        case Building::TypePigFarm:
+        case Building::TypeMill:
+        case Building::TypeBaker:
+            return 5.0f;
+            
+        // Resource extraction
+        case Building::TypeLumberjack:
+        case Building::TypeForester:
+        case Building::TypeStonecutter:
+            return 6.0f;
+            
+        // Advanced manufacturing  
+        case Building::TypeBoatbuilder:
+        case Building::TypeSawmill:
+        case Building::TypeSteelSmelter:
+        case Building::TypeToolMaker:
+        case Building::TypeWeaponSmith:
+        case Building::TypeGoldSmelter:
+            return 7.0f;
+            
+        // Mining (valuable)
+        case Building::TypeStoneMine:
+        case Building::TypeCoalMine:
+        case Building::TypeIronMine:
+        case Building::TypeGoldMine:
+            return 8.0f;
+            
+        // Military (strategic)
+        case Building::TypeHut:
+            return 6.0f;
+        case Building::TypeTower:
+            return 8.0f;
+        case Building::TypeFortress:
+            return 10.0f;
+            
+        // Storage (utility)
+        case Building::TypeStock:
+            return 4.0f;
+            
+        // Castle (special)
+        case Building::TypeCastle:
+            return 10.0f;
+            
+        default:
+            return 5.0f;
+    }
+}
+
 AgentIntegration::PerformanceMetrics AgentIntegration::get_performance_metrics(const Player* player) {
     PerformanceMetrics metrics = {};
     
@@ -672,9 +863,9 @@ void AgentIntegration::setup_ai_players(int ai_count) {
             continue;
         }
         
-        // Create a ScriptedAgent
-        std::string agent_name = "ScriptedAgent_P" + std::to_string(i);
-        auto agent = AgentFactory::create_scripted_agent(5, 0, agent_name);
+        // Create a RandomAgent for testing complete build actions
+        std::string agent_name = "RandomAgent_P" + std::to_string(i);
+        auto agent = AgentFactory::create_random_agent(agent_name);
         
         if (agent) {
             attach_agent(player, std::move(agent));

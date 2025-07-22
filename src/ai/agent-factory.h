@@ -45,6 +45,8 @@ public:
                                                      bool training_mode = false,
                                                      const std::string& name = "NeuralAgent");
     
+    static std::unique_ptr<Agent> create_random_agent(const std::string& name = "RandomAgent");
+    
     // Agent type registration (for extensibility)
     static void register_agent_type(AgentType type, 
                                    std::function<std::unique_ptr<Agent>(const AgentConfig&)> creator);
