@@ -141,13 +141,31 @@ std::vector<AIAction> RandomAgent::get_actions(const GameState& state) {
                 AILogger::log_debug(agent_name + ": Random building " + std::to_string(static_cast<int>(random_type)) + 
                                    " at " + std::to_string(random_pos));
                 actions_this_tick++;
+                
+                // IMMEDIATE ROAD BUILDING: Connect building to existing network
+                if (actions_this_tick < MAX_ACTIONS_PER_TICK) {
+                    MapPos building_flag_pos = calculate_building_flag_position(random_pos, random_type, state);
+                    if (building_flag_pos != 0) {
+                        MapPos target_flag = find_connection_target_flag(state, building_flag_pos);
+                        if (target_flag != 0 && target_flag != building_flag_pos) {
+                            actions.push_back(AIAction::build_road(building_flag_pos, target_flag));
+                            AILogger::log_debug(agent_name + ": Immediate road connection " + 
+                                               std::to_string(building_flag_pos) + " -> " + std::to_string(target_flag));
+                            actions_this_tick++;
+                        } else {
+                            AILogger::log_debug(agent_name + ": No suitable connection target for building at " + std::to_string(random_pos));
+                        }
+                    } else {
+                        AILogger::log_debug(agent_name + ": Could not calculate flag position for building at " + std::to_string(random_pos));
+                    }
+                }
             }
         }
     }
     
-    // Random road building
-    if (should_build_roads(state) && actions_this_tick < MAX_ACTIONS_PER_TICK) {
-        auto available_flags = get_available_flags(state);
+    // Reduced random road building (to avoid conflicts with immediate connections)
+    if (actions.empty() && should_build_roads(state) && prob_dist(gen) < 0.05f) { // Much lower probability
+        auto available_flags = find_all_player_flags(state);
         if (available_flags.size() >= 2) {
             std::uniform_int_distribution<size_t> flag_selector(0, available_flags.size() - 1);
             MapPos flag1 = available_flags[flag_selector(gen)];
@@ -155,7 +173,7 @@ std::vector<AIAction> RandomAgent::get_actions(const GameState& state) {
             
             if (flag1 != flag2) {
                 actions.push_back(AIAction::build_road(flag1, flag2));
-                AILogger::log_debug(agent_name + ": Random road " + std::to_string(flag1) + " -> " + std::to_string(flag2));
+                AILogger::log_debug(agent_name + ": Supplemental road " + std::to_string(flag1) + " -> " + std::to_string(flag2));
                 actions_this_tick++;
             }
         }
@@ -295,4 +313,325 @@ std::string RandomAgent::get_agent_name() const {
 
 bool RandomAgent::is_ready() const {
     return true;  // RandomAgent is always ready
+}
+
+// Flag discovery system implementation for immediate road building
+
+MapPos RandomAgent::calculate_building_flag_position(MapPos building_pos, Building::Type type, const GameState& state) {
+    // For RandomAgent, we can't access Game object directly, so we estimate flag position
+    // Based on research: flags are typically placed adjacent to buildings
+    // This is a simplified approach - ideally we would query the game after building placement
+    
+    const auto& map = state.map;
+    if (map.width == 0 || map.height == 0) {
+        return 0;
+    }
+    
+    int x = building_pos % map.width;
+    int y = building_pos / map.width;
+    
+    // Try common flag positions relative to building (down-right is typical)
+    std::vector<std::pair<int, int>> offsets = {
+        {1, 1},   // down-right (most common)
+        {1, 0},   // right
+        {0, 1},   // down
+        {-1, 1},  // down-left
+        {1, -1},  // up-right
+        {0, -1}   // up
+    };
+    
+    for (const auto& offset : offsets) {
+        int new_x = x + offset.first;
+        int new_y = y + offset.second;
+        
+        if (new_x >= 0 && new_x < static_cast<int>(map.width) && 
+            new_y >= 0 && new_y < static_cast<int>(map.height)) {
+            
+            MapPos pos = new_y * map.width + new_x;
+            
+            // Check if position is likely suitable for flag (simple heuristic)
+            if (pos < map.has_flag.size() && !map.has_building[pos]) {
+                return pos;
+            }
+        }
+    }
+    
+    return 0; // No suitable position found
+}
+
+std::vector<MapPos> RandomAgent::find_all_player_flags(const GameState& state) {
+    std::vector<MapPos> flags;
+    const auto& map = state.map;
+    
+    // Scan the has_flag boolean vector to find all flag positions
+    for (size_t i = 0; i < map.has_flag.size(); ++i) {
+        if (map.has_flag[i]) {
+            // Check if this flag belongs to our player by checking nearby ownership
+            if (i < map.ownership.size() && map.ownership[i] == state.self.player_index) {
+                flags.push_back(static_cast<MapPos>(i));
+            }
+        }
+    }
+    
+    AILogger::log_debug(agent_name + ": Found " + std::to_string(flags.size()) + " player flags");
+    return flags;
+}
+
+MapPos RandomAgent::find_castle_flag(const GameState& state) {
+    AILogger::log_debug(agent_name + ": Looking for castle - building_positions.size=" + 
+                       std::to_string(state.self.building_positions.size()) + 
+                       ", building_types.size=" + std::to_string(state.self.building_types.size()));
+    
+    // Method 1: Look for castle in building positions array
+    for (size_t i = 0; i < state.self.building_positions.size(); ++i) {
+        if (state.self.building_types[i] == Building::TypeCastle) {
+            MapPos castle_pos = state.self.building_positions[i];
+            AILogger::log_debug(agent_name + ": Castle found in array at position " + std::to_string(castle_pos));
+            
+            // Use area scanning to find the actual flag near castle position
+            MapPos castle_flag = find_actual_flag_near_position(castle_pos, state, 5); // 5-tile radius search
+            if (castle_flag != 0) {
+                AILogger::log_debug(agent_name + ": Castle flag found at " + std::to_string(castle_flag) + 
+                                   " (near castle at " + std::to_string(castle_pos) + ")");
+                return castle_flag;
+            } else {
+                AILogger::log_debug(agent_name + ": Castle at " + std::to_string(castle_pos) + 
+                                   " has no flag in 5-tile radius - may still be under construction");
+            }
+        }
+    }
+    
+    // Method 2: Fallback - scan the map for flags near buildings
+    AILogger::log_debug(agent_name + ": No castle in building array, scanning map for potential castle flags");
+    const auto& map = state.map;
+    
+    // Look for flags in areas where we own territory (likely near our castle)
+    std::vector<MapPos> potential_castle_flags;
+    for (size_t i = 0; i < map.has_flag.size() && i < map.ownership.size(); ++i) {
+        if (map.has_flag[i] && map.ownership[i] == state.self.player_index) {
+            // Check if this flag is in a central area of our territory (potential castle location)
+            int nearby_owned_tiles = 0;
+            int x = i % map.width;
+            int y = i / map.width;
+            
+            // Count owned tiles in 5x5 area around flag
+            for (int dx = -2; dx <= 2; dx++) {
+                for (int dy = -2; dy <= 2; dy++) {
+                    int nx = x + dx;
+                    int ny = y + dy;
+                    if (nx >= 0 && nx < static_cast<int>(map.width) && 
+                        ny >= 0 && ny < static_cast<int>(map.height)) {
+                        MapPos pos = ny * map.width + nx;
+                        if (pos < map.ownership.size() && map.ownership[pos] == state.self.player_index) {
+                            nearby_owned_tiles++;
+                        }
+                    }
+                }
+            }
+            
+            // If this flag has many owned tiles around it, it's likely the castle flag
+            if (nearby_owned_tiles >= 15) { // At least 15/25 tiles owned
+                potential_castle_flags.push_back(i);
+                AILogger::log_debug(agent_name + ": Potential castle flag at " + std::to_string(i) + 
+                                   " (owned_tiles: " + std::to_string(nearby_owned_tiles) + ")");
+            }
+        }
+    }
+    
+    // Return the first potential castle flag found
+    if (!potential_castle_flags.empty()) {
+        MapPos castle_flag = potential_castle_flags[0];
+        AILogger::log_debug(agent_name + ": Using fallback castle flag at " + std::to_string(castle_flag));
+        return castle_flag;
+    }
+    
+    AILogger::log_debug(agent_name + ": No castle flag found via any method");
+    return 0;
+}
+
+MapPos RandomAgent::find_nearest_flag(const GameState& state, MapPos target_pos) {
+    std::vector<MapPos> available_flags = find_all_player_flags(state);
+    
+    if (available_flags.empty()) {
+        return 0;
+    }
+    
+    MapPos nearest = available_flags[0];
+    int min_distance = calculate_distance(target_pos, nearest, state);
+    
+    for (MapPos flag_pos : available_flags) {
+        int distance = calculate_distance(target_pos, flag_pos, state);
+        if (distance < min_distance) {
+            min_distance = distance;
+            nearest = flag_pos;
+        }
+    }
+    
+    AILogger::log_debug(agent_name + ": Nearest flag at " + std::to_string(nearest) + 
+                       " (distance: " + std::to_string(min_distance) + ")");
+    return nearest;
+}
+
+int RandomAgent::calculate_distance(MapPos pos1, MapPos pos2, const GameState& state) {
+    const auto& map = state.map;
+    if (map.width == 0) {
+        return 1000; // Large distance if invalid map
+    }
+    
+    int x1 = pos1 % map.width;
+    int y1 = pos1 / map.width;
+    int x2 = pos2 % map.width;
+    int y2 = pos2 / map.width;
+    
+    // Manhattan distance - simple and fast
+    return abs(x1 - x2) + abs(y1 - y2);
+}
+
+MapPos RandomAgent::find_connection_target_flag(const GameState& state, MapPos new_flag_pos) {
+    // Priority 1: Connect to castle flag if available and castle has few connections
+    MapPos castle_flag = find_castle_flag(state);
+    if (castle_flag != 0) {
+        int distance = calculate_distance(new_flag_pos, castle_flag, state);
+        int castle_connections = count_castle_connections(state);
+        
+        // Prioritize castle connections especially if castle is isolated
+        bool should_connect_to_castle = false;
+        if (castle_connections == 0) {
+            // Castle is isolated - connect even if far away
+            should_connect_to_castle = (distance <= 30);
+            AILogger::log_debug(agent_name + ": Castle is isolated (" + std::to_string(castle_connections) + 
+                               " connections), prioritizing connection");
+        } else if (castle_connections < 3) {
+            // Castle has few connections - normal priority
+            should_connect_to_castle = (distance <= 20);
+            AILogger::log_debug(agent_name + ": Castle has " + std::to_string(castle_connections) + 
+                               " connections, normal priority");
+        } else {
+            // Castle is well connected - lower priority
+            should_connect_to_castle = (distance <= 12);
+            AILogger::log_debug(agent_name + ": Castle has " + std::to_string(castle_connections) + 
+                               " connections, lower priority");
+        }
+        
+        if (should_connect_to_castle) {
+            AILogger::log_debug(agent_name + ": Target: castle flag at " + std::to_string(castle_flag) + 
+                               " (distance: " + std::to_string(distance) + 
+                               ", connections: " + std::to_string(castle_connections) + ") [CASTLE PRIORITY]");
+            return castle_flag;
+        } else {
+            AILogger::log_debug(agent_name + ": Castle flag at " + std::to_string(castle_flag) + 
+                               " too far (distance: " + std::to_string(distance) + 
+                               ", connections: " + std::to_string(castle_connections) + ")");
+        }
+    }
+    
+    // Priority 2: Connect to nearest existing flag
+    MapPos nearest_flag = find_nearest_flag(state, new_flag_pos);
+    if (nearest_flag != 0 && nearest_flag != castle_flag) {
+        int distance = calculate_distance(new_flag_pos, nearest_flag, state);
+        if (distance <= 15) { // Reasonable distance limit
+            AILogger::log_debug(agent_name + ": Target: nearest flag at " + std::to_string(nearest_flag) + 
+                               " (distance: " + std::to_string(distance) + ") [NEAREST]");
+            return nearest_flag;
+        }
+    }
+    
+    AILogger::log_debug(agent_name + ": No suitable connection target found");
+    return 0; // No suitable target found
+}
+
+// Robust castle flag detection system implementation
+
+MapPos RandomAgent::find_actual_flag_near_position(MapPos center, const GameState& state, int radius) {
+    const auto& map = state.map;
+    if (map.width == 0 || map.height == 0 || center >= map.has_flag.size()) {
+        return 0;
+    }
+    
+    int center_x = center % map.width;
+    int center_y = center / map.width;
+    int flags_scanned = 0;
+    MapPos closest_flag = 0;
+    int closest_distance = 1000;
+    
+    AILogger::log_debug(agent_name + ": Scanning for flags near position " + std::to_string(center) + 
+                       " (" + std::to_string(center_x) + "," + std::to_string(center_y) + ") radius=" + std::to_string(radius));
+    
+    // Scan in expanding radius around center position
+    for (int r = 1; r <= radius; r++) {
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dy = -r; dy <= r; dy++) {
+                // Only check positions at current radius (not inner positions already checked)
+                if (abs(dx) != r && abs(dy) != r) continue;
+                
+                int x = center_x + dx;
+                int y = center_y + dy;
+                
+                // Bounds check
+                if (x < 0 || x >= static_cast<int>(map.width) || 
+                    y < 0 || y >= static_cast<int>(map.height)) {
+                    continue;
+                }
+                
+                MapPos pos = y * map.width + x;
+                if (pos >= map.has_flag.size()) continue;
+                
+                flags_scanned++;
+                
+                // Check if there's a flag at this position
+                if (map.has_flag[pos]) {
+                    // Verify ownership - check if this flag belongs to our player
+                    if (pos < map.ownership.size() && map.ownership[pos] == state.self.player_index) {
+                        int distance = abs(dx) + abs(dy); // Manhattan distance
+                        if (distance < closest_distance) {
+                            closest_distance = distance;
+                            closest_flag = pos;
+                        }
+                        AILogger::log_debug(agent_name + ": Found player flag at " + std::to_string(pos) + 
+                                           " (" + std::to_string(x) + "," + std::to_string(y) + 
+                                           ") distance=" + std::to_string(distance));
+                    }
+                }
+            }
+        }
+    }
+    
+    if (closest_flag != 0) {
+        AILogger::log_debug(agent_name + ": Closest flag at " + std::to_string(closest_flag) + 
+                           " (distance: " + std::to_string(closest_distance) + 
+                           ", flags_scanned: " + std::to_string(flags_scanned) + ")");
+    } else {
+        AILogger::log_debug(agent_name + ": No flags found in radius " + std::to_string(radius) + 
+                           " (flags_scanned: " + std::to_string(flags_scanned) + ")");
+    }
+    
+    return closest_flag;
+}
+
+bool RandomAgent::is_castle_connected(const GameState& state) {
+    return count_castle_connections(state) > 0;
+}
+
+int RandomAgent::count_castle_connections(const GameState& state) {
+    MapPos castle_flag = find_castle_flag(state);
+    if (castle_flag == 0) {
+        return 0;
+    }
+    
+    // Count flags connected to castle flag by checking nearby road connections
+    // This is a simplified check - in a full implementation we'd trace actual road paths
+    std::vector<MapPos> all_flags = find_all_player_flags(state);
+    int connections = 0;
+    
+    for (MapPos flag_pos : all_flags) {
+        if (flag_pos != castle_flag) {
+            int distance = calculate_distance(castle_flag, flag_pos, state);
+            if (distance <= 3) { // Assume close flags might be connected
+                connections++;
+            }
+        }
+    }
+    
+    AILogger::log_debug(agent_name + ": Castle connections estimated: " + std::to_string(connections));
+    return connections;
 }

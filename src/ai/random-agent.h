@@ -53,4 +53,17 @@ private:
     std::vector<MapPos> get_owned_positions(const GameState& state);
     std::vector<MapPos> get_available_flags(const GameState& state);
     AIActionType building_type_to_action_type(Building::Type type);
+    
+    // Flag discovery system for immediate road building
+    MapPos calculate_building_flag_position(MapPos building_pos, Building::Type type, const GameState& state);
+    std::vector<MapPos> find_all_player_flags(const GameState& state);
+    MapPos find_castle_flag(const GameState& state);
+    MapPos find_nearest_flag(const GameState& state, MapPos target_pos);
+    int calculate_distance(MapPos pos1, MapPos pos2, const GameState& state);
+    MapPos find_connection_target_flag(const GameState& state, MapPos new_flag_pos);
+    
+    // Robust castle flag detection system
+    MapPos find_actual_flag_near_position(MapPos center, const GameState& state, int radius);
+    bool is_castle_connected(const GameState& state);
+    int count_castle_connections(const GameState& state);
 };
