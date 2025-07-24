@@ -192,7 +192,8 @@ bool SDL_RenderFillRect_Compat(SDL_Renderer *renderer, const SDL_Rect *rect);
 // SDL3 Mix_OpenAudio compatibility wrapper
 inline bool SDL_COMPAT_MIX_OPEN_AUDIO(int freq, SDL_AudioFormat format, int channels, int chunksize) {
   SDL_AudioSpec spec = {format, channels, freq};
-  return Mix_OpenAudio(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec);
+  // return Mix_OpenAudio(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec);
+  return false;
 }
 
 // SDL3 RWops -> IOStream compatibility
@@ -228,6 +229,7 @@ inline const SDL_version* Mix_Linked_Version() {
 }
 
 // SDL3 LoadWAV compatibility wrapper
+/*
 inline Mix_Chunk* SDL_LoadWAV_IO_Compat(SDL_IOStream *src, int freesrc) {
   SDL_AudioSpec spec;
   Uint8 *audio_buf;
@@ -249,7 +251,7 @@ inline Mix_Chunk* SDL_LoadWAV_IO_Compat(SDL_IOStream *src, int freesrc) {
   
   return chunk;
 }
-
+*/
 #undef SDL_LoadWAV_RW
 #define SDL_LoadWAV_RW SDL_LoadWAV_IO_Compat
 
