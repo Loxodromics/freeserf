@@ -209,6 +209,17 @@ std::string AILogger::get_action_description(const AIAction& action) {
         case AIActionType::BUILD_FORESTER:
             oss << "BUILD_FORESTER(" << format_position(action.primary_position) << ")";
             break;
+        // Demolition actions
+        case AIActionType::DEMOLISH_BUILDING:
+            oss << "DEMOLISH_BUILDING(" << format_position(action.primary_position) << ")";
+            break;
+        case AIActionType::DEMOLISH_FLAG:
+            oss << "DEMOLISH_FLAG(" << format_position(action.primary_position) << ")";
+            break;
+        case AIActionType::DEMOLISH_ROAD:
+            oss << "DEMOLISH_ROAD(" << format_position(action.primary_position) << ")";
+            break;
+            
         case AIActionType::NO_ACTION:
             oss << "NO_ACTION";
             break;

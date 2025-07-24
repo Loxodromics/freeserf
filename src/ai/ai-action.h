@@ -39,6 +39,11 @@ enum class AIActionType {
     BUILD_FORTRESS = 24,
     BUILD_GOLD_SMELTER = 25,
     
+    // Demolition Actions
+    DEMOLISH_BUILDING = 50,
+    DEMOLISH_FLAG = 51,
+    DEMOLISH_ROAD = 52,
+    
     // Special Actions
     NO_ACTION = 99,
     WAIT = 100,
@@ -170,6 +175,19 @@ struct AIAction {
     
     static AIAction build_gold_smelter(MapPos pos, float priority = 0.7f) {
         return {AIActionType::BUILD_GOLD_SMELTER, pos, 0, 0, 0, priority, 1.0f};
+    }
+    
+    // Demolition Factory Methods
+    static AIAction demolish_building(MapPos pos, float priority = 0.3f) {
+        return {AIActionType::DEMOLISH_BUILDING, pos, 0, 0, 0, priority, 1.0f};
+    }
+    
+    static AIAction demolish_flag(MapPos pos, float priority = 0.3f) {
+        return {AIActionType::DEMOLISH_FLAG, pos, 0, 0, 0, priority, 1.0f};
+    }
+    
+    static AIAction demolish_road(MapPos pos, float priority = 0.3f) {
+        return {AIActionType::DEMOLISH_ROAD, pos, 0, 0, 0, priority, 1.0f};
     }
     
     static AIAction no_action() {

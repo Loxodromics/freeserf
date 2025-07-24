@@ -250,6 +250,14 @@ AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::vali
         case AIActionType::BUILD_GOLD_SMELTER:
             return validate_build_building(action.primary_position, Building::TypeGoldSmelter, game, player);
             
+        // Demolition action validations
+        case AIActionType::DEMOLISH_BUILDING:
+            return validate_demolish_building(action.primary_position, game, player);
+        case AIActionType::DEMOLISH_FLAG:
+            return validate_demolish_flag(action.primary_position, game, player);
+        case AIActionType::DEMOLISH_ROAD:
+            return validate_demolish_road(action.primary_position, game, player);
+            
         case AIActionType::NO_ACTION:
         case AIActionType::WAIT:
             return {true, "No action or wait - always valid", ActionError::SUCCESS, 1.0f};
@@ -537,6 +545,17 @@ std::vector<AgentIntegration::ActionResult> AgentIntegration::ActionExecutor::ex
                 break;
             case AIActionType::BUILD_GOLD_SMELTER:
                 result = execute_build_building_generic(action, Building::TypeGoldSmelter, game, player);
+                break;
+                
+            // Demolition action executions
+            case AIActionType::DEMOLISH_BUILDING:
+                result = execute_demolish_building(action, game, player);
+                break;
+            case AIActionType::DEMOLISH_FLAG:
+                result = execute_demolish_flag(action, game, player);
+                break;
+            case AIActionType::DEMOLISH_ROAD:
+                result = execute_demolish_road(action, game, player);
                 break;
                 
             case AIActionType::NO_ACTION:
@@ -841,6 +860,139 @@ void AgentIntegration::agent_game_started(const Game* game) {
 
 void AgentIntegration::agent_game_ended(const Game* game, bool victory) {
     // TODO: Implement game lifecycle management in Phase 0.4
+}
+
+// Demolition validation methods
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_demolish_building(
+    MapPos pos, const Game* game, const Player* player) {
+    
+    // Check if there's a building at this position that belongs to the player
+    PMap map = const_cast<Game*>(game)->get_map();
+    if (!map->has_building(pos)) {
+        return {false, "No building at position", ActionError::INVALID_POSITION, 0.0f};
+    }
+    
+    // Get building and check ownership
+    Building* building = const_cast<Game*>(game)->get_building_at_pos(pos);
+    if (!building) {
+        return {false, "No building at position", ActionError::INVALID_POSITION, 0.0f};
+    }
+    
+    if (building->get_owner() != player->get_index()) {
+        return {false, "Building not owned by player", ActionError::INVALID_POSITION, 0.0f};
+    }
+    
+    // Check if building is in a state that can be demolished (not burning, etc.)
+    if (building->is_burning()) {
+        return {false, "Cannot demolish burning building", ActionError::INVALID_POSITION, 0.0f};
+    }
+    
+    return {true, "Building can be demolished", ActionError::SUCCESS, 1.0f};
+}
+
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_demolish_flag(
+    MapPos pos, const Game* game, const Player* player) {
+    
+    // Use existing game validation method
+    bool can_demolish = game->can_demolish_flag(pos, player);
+    
+    if (can_demolish) {
+        return {true, "Flag can be demolished", ActionError::SUCCESS, 1.0f};
+    } else {
+        return {false, "Cannot demolish flag at position", ActionError::INVALID_POSITION, 0.0f};
+    }
+}
+
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_demolish_road(
+    MapPos pos, const Game* game, const Player* player) {
+    
+    // Use existing game validation method
+    bool can_demolish = game->can_demolish_road(pos, player);
+    
+    if (can_demolish) {
+        return {true, "Road can be demolished", ActionError::SUCCESS, 1.0f};
+    } else {
+        return {false, "Cannot demolish road at position", ActionError::INVALID_POSITION, 0.0f};
+    }
+}
+
+// Demolition execution methods
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_demolish_building(
+    const AIAction& action, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Validate first
+    auto validation = ActionValidator::validate_demolish_building(action.primary_position, game, player);
+    if (!validation.is_valid) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result(validation.failure_reason, validation.error_code, duration);
+    }
+    
+    // Execute demolition using existing game method
+    bool success = game->demolish_building(action.primary_position, player);
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
+    if (success) {
+        return create_success_result("Building demolished successfully", -2.0f, execution_time);
+    } else {
+        return create_failure_result("Building demolition failed", ActionError::GAME_ENGINE_ERROR, execution_time);
+    }
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_demolish_flag(
+    const AIAction& action, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Validate first
+    auto validation = ActionValidator::validate_demolish_flag(action.primary_position, game, player);
+    if (!validation.is_valid) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result(validation.failure_reason, validation.error_code, duration);
+    }
+    
+    // Execute demolition using existing game method
+    bool success = game->demolish_flag(action.primary_position, player);
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
+    if (success) {
+        return create_success_result("Flag demolished successfully", -1.0f, execution_time);
+    } else {
+        return create_failure_result("Flag demolition failed", ActionError::GAME_ENGINE_ERROR, execution_time);
+    }
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_demolish_road(
+    const AIAction& action, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Validate first
+    auto validation = ActionValidator::validate_demolish_road(action.primary_position, game, player);
+    if (!validation.is_valid) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return create_failure_result(validation.failure_reason, validation.error_code, duration);
+    }
+    
+    // Execute demolition using existing game method
+    bool success = game->demolish_road(action.primary_position, player);
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
+    if (success) {
+        return create_success_result("Road demolished successfully", -0.5f, execution_time);
+    } else {
+        return create_failure_result("Road demolition failed", ActionError::GAME_ENGINE_ERROR, execution_time);
+    }
 }
 
 void AgentIntegration::setup_ai_players(int ai_count) {

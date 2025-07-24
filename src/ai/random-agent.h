@@ -66,4 +66,28 @@ private:
     MapPos find_actual_flag_near_position(MapPos center, const GameState& state, int radius);
     bool is_castle_connected(const GameState& state);
     int count_castle_connections(const GameState& state);
+    
+    // Sequential building->road->demolish state tracking
+    struct PendingBuilding {
+        MapPos position;           // Building position
+        MapPos flag_position;      // Building's flag position
+        Building::Type type;       // Building type (for castle protection)
+        uint32_t built_tick;       // Tick when building was placed
+        
+        PendingBuilding(MapPos pos, MapPos flag_pos, Building::Type building_type, uint32_t tick)
+            : position(pos), flag_position(flag_pos), type(building_type), built_tick(tick) {}
+    };
+    
+    std::vector<PendingBuilding> buildings_awaiting_connection;
+    std::vector<PendingBuilding> buildings_failed_connection;
+    
+    // State management methods
+    void update_building_states(const GameState& state);
+    void add_pending_building(MapPos building_pos, MapPos flag_pos, Building::Type type, uint32_t tick);
+    void move_to_failed_connection(const PendingBuilding& building);
+    bool is_castle_building(Building::Type type);
+    void clear_completed_buildings(const GameState& state);
+    
+    // Helper method for building creation
+    AIAction create_building_action(Building::Type building_type, MapPos pos);
 };

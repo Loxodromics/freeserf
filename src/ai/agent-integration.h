@@ -63,6 +63,11 @@ public:
         static ActionValidationResult validate_build_road(MapPos from, MapPos to, const Game* game, const Player* player);
         static ActionValidationResult validate_build_building(MapPos pos, Building::Type type, const Game* game, const Player* player);
         
+        // Demolition validation methods
+        static ActionValidationResult validate_demolish_building(MapPos pos, const Game* game, const Player* player);
+        static ActionValidationResult validate_demolish_flag(MapPos pos, const Game* game, const Player* player);
+        static ActionValidationResult validate_demolish_road(MapPos pos, const Game* game, const Player* player);
+        
     private:
         // Helper method for smart castle position finding
         static MapPos find_valid_castle_position_nearby(MapPos suggested_pos, Game* game, Player* player);
@@ -91,6 +96,12 @@ public:
         static ActionResult execute_build_forester(const AIAction& action, Game* game, Player* player);
         static ActionResult execute_build_building_generic(const AIAction& action, Building::Type building_type, Game* game, Player* player);
         static float calculate_building_reward(Building::Type type);
+        
+        // Demolition execution methods
+        static ActionResult execute_demolish_building(const AIAction& action, Game* game, Player* player);
+        static ActionResult execute_demolish_flag(const AIAction& action, Game* game, Player* player);
+        static ActionResult execute_demolish_road(const AIAction& action, Game* game, Player* player);
+        
         static ActionResult create_success_result(const std::string& message, float reward, std::chrono::microseconds exec_time);
         static ActionResult create_failure_result(const std::string& message, ActionError error, std::chrono::microseconds exec_time);
     };
