@@ -41,152 +41,158 @@ void RandomAgent::initialize_building_types() {
 std::vector<AIAction> RandomAgent::get_actions(const GameState& state) {
     std::vector<AIAction> actions;
     
+    // Log tick and state information for timing analysis
+    AILogger::log_debug(agent_name + ": [TICK START] Tick " + std::to_string(state.game_tick) + 
+                       " - awaiting: " + std::to_string(buildings_awaiting_connection.size()) + 
+                       ", failed: " + std::to_string(buildings_failed_connection.size()) + 
+                       ", has_flag.size: " + std::to_string(state.map.has_flag.size()));
+    
+    // Update internal state first
+    update_building_states(state);
+    
     // Handle castle building first (if needed)
     if (!state.self.has_castle) {
-        // Find a random position for castle
         MapPos castle_pos = get_random_position(state);
         if (castle_pos != 0) {
             actions.push_back(AIAction::build_castle(castle_pos));
-            AILogger::log_debug(agent_name + ": Placing random castle at " + std::to_string(castle_pos));
-            return actions;  // Only castle this tick
+            AILogger::log_debug(agent_name + ": Placing castle at " + std::to_string(castle_pos) + 
+                               " [IMMEDIATE CONNECTION WILL BE SKIPPED - CASTLE IS ROOT]");
+            return actions;  // Only castle this tick, no immediate connection needed
         }
     }
     
     int actions_this_tick = 0;
     
-    // Random building placement
-    if (should_place_building(state) && actions_this_tick < MAX_ACTIONS_PER_TICK) {
+    // PRIORITY 1: Connect recently built buildings (highest priority)
+    if (actions_this_tick < MAX_ACTIONS_PER_TICK && !buildings_awaiting_connection.empty()) {
+        auto& pending = buildings_awaiting_connection[0];
+        
+        AILogger::log_debug(agent_name + ": [PRIORITY 1] Processing building at " + std::to_string(pending.position) + 
+                           " (type: " + std::to_string(static_cast<int>(pending.type)) + 
+                           ", flag: " + std::to_string(pending.flag_position) + 
+                           ", built_tick: " + std::to_string(pending.built_tick) +
+                           ", age: " + std::to_string(state.game_tick - pending.built_tick) + ")");
+        
+        // CRITICAL: First verify that the building actually exists (placement may have failed)
+        // BUT: Allow grace period for GameState synchronization (buildings need 3-4 ticks to appear in state)
+        uint32_t building_age = state.game_tick - pending.built_tick;
+        if (building_age >= 4) { // Only check existence after grace period
+            if (pending.position >= state.map.has_building.size() || !state.map.has_building[pending.position]) {
+                AILogger::log_debug(agent_name + ": [BUILDING VALIDATION] Building at " + std::to_string(pending.position) + 
+                                   " does not exist after grace period - placement failed (tick " + std::to_string(state.game_tick) + 
+                                   ", age " + std::to_string(building_age) + "), removing from queue");
+                // Remove from pending list - building placement definitely failed
+                buildings_awaiting_connection.erase(buildings_awaiting_connection.begin());
+                return actions; // Continue processing next tick
+            } else {
+                AILogger::log_debug(agent_name + ": [BUILDING VALIDATION] Building at " + std::to_string(pending.position) + 
+                                   " exists after grace period (age " + std::to_string(building_age) + "), proceeding with connection");
+            }
+        } else {
+            AILogger::log_debug(agent_name + ": [GAMESTATE SYNC] Building at " + std::to_string(pending.position) + 
+                               " still in grace period (age " + std::to_string(building_age) + 
+                               "), waiting for GameState synchronization");
+            return actions; // Wait for GameState to synchronize
+        }
+        
+        // CRITICAL: Verify that the building's flag actually exists before attempting connection
+        if (pending.flag_position >= state.map.has_flag.size() || !state.map.has_flag[pending.flag_position]) {
+            AILogger::log_debug(agent_name + ": [FLAG VALIDATION] Building flag at " + std::to_string(pending.flag_position) + 
+                               " does not exist yet (tick " + std::to_string(state.game_tick) + 
+                               ", age " + std::to_string(state.game_tick - pending.built_tick) + "), deferring connection");
+            return actions; // Wait for flag to be created
+        }
+        
+        AILogger::log_debug(agent_name + ": [PRIORITY 1] Flag at " + std::to_string(pending.flag_position) + " exists, searching for connection target");
+        MapPos target_flag = find_connection_target_flag(state, pending.flag_position);
+        
+        if (target_flag != 0 && target_flag != pending.flag_position) {
+            // Connection possible - build road
+            actions.push_back(AIAction::build_road(pending.flag_position, target_flag));
+            AILogger::log_debug(agent_name + ": [PRIORITY 1] Connecting pending building at " + 
+                               std::to_string(pending.position) + " (flag: " + std::to_string(pending.flag_position) + 
+                               " -> " + std::to_string(target_flag) + ")");
+            actions_this_tick++;
+            // Remove from pending list on attempt
+            buildings_awaiting_connection.erase(buildings_awaiting_connection.begin());
+        } else {
+            // No connection possible - move to failed list
+            AILogger::log_debug(agent_name + ": [PRIORITY 1] No connection target for building at " + 
+                               std::to_string(pending.position) + ", moving to demolition queue");
+            move_to_failed_connection(pending);
+            buildings_awaiting_connection.erase(buildings_awaiting_connection.begin());
+        }
+    }
+    
+    // PRIORITY 2: Demolish buildings that failed connection (but never castles)
+    if (actions_this_tick < MAX_ACTIONS_PER_TICK && !buildings_failed_connection.empty()) {
+        auto& failed = buildings_failed_connection[0];
+        
+        if (!is_castle_building(failed.type)) {
+            // Safe to demolish non-castle building
+            actions.push_back(AIAction::demolish_building(failed.position));
+            AILogger::log_debug(agent_name + ": [PRIORITY 2] Demolishing unconnectable building at " + 
+                               std::to_string(failed.position) + " (type: " + 
+                               std::to_string(static_cast<int>(failed.type)) + ")");
+            actions_this_tick++;
+        } else {
+            // Castle protection - never demolish castles
+            AILogger::log_debug(agent_name + ": [CASTLE PROTECTION] Refusing to demolish castle at " + 
+                               std::to_string(failed.position) + " - castle preserved");
+        }
+        
+        // Remove from failed list regardless of whether we demolished it
+        buildings_failed_connection.erase(buildings_failed_connection.begin());
+    }
+    
+    // PRIORITY 3: Place new buildings (one action per tick)
+    if (actions_this_tick < MAX_ACTIONS_PER_TICK && should_place_building(state)) {
         Building::Type random_type = get_random_building_type();
         MapPos random_pos = get_random_position(state);
         
+        AILogger::log_debug(agent_name + ": [PRIORITY 3] Attempting to place building type " + 
+                           std::to_string(static_cast<int>(random_type)) + " at position " + 
+                           std::to_string(random_pos) + " on tick " + std::to_string(state.game_tick));
+        
         if (random_pos != 0) {
-            AIActionType action_type = building_type_to_action_type(random_type);
+            // Place building only - connection will be attempted next tick
+            actions.push_back(create_building_action(random_type, random_pos));
             
-            switch (action_type) {
-                case AIActionType::BUILD_FISHER:
-                    actions.push_back(AIAction::build_fisher(random_pos));
-                    break;
-                case AIActionType::BUILD_BOATBUILDER:
-                    actions.push_back(AIAction::build_boatbuilder(random_pos));
-                    break;
-                case AIActionType::BUILD_STONECUTTER:
-                    actions.push_back(AIAction::build_stonecutter(random_pos));
-                    break;
-                case AIActionType::BUILD_STONE_MINE:
-                    actions.push_back(AIAction::build_stone_mine(random_pos));
-                    break;
-                case AIActionType::BUILD_COAL_MINE:
-                    actions.push_back(AIAction::build_coal_mine(random_pos));
-                    break;
-                case AIActionType::BUILD_IRON_MINE:
-                    actions.push_back(AIAction::build_iron_mine(random_pos));
-                    break;
-                case AIActionType::BUILD_GOLD_MINE:
-                    actions.push_back(AIAction::build_gold_mine(random_pos));
-                    break;
-                case AIActionType::BUILD_STOCK:
-                    actions.push_back(AIAction::build_stock(random_pos));
-                    break;
-                case AIActionType::BUILD_HUT:
-                    actions.push_back(AIAction::build_hut(random_pos));
-                    break;
-                case AIActionType::BUILD_FARM:
-                    actions.push_back(AIAction::build_farm(random_pos));
-                    break;
-                case AIActionType::BUILD_BUTCHER:
-                    actions.push_back(AIAction::build_butcher(random_pos));
-                    break;
-                case AIActionType::BUILD_PIG_FARM:
-                    actions.push_back(AIAction::build_pig_farm(random_pos));
-                    break;
-                case AIActionType::BUILD_MILL:
-                    actions.push_back(AIAction::build_mill(random_pos));
-                    break;
-                case AIActionType::BUILD_BAKER:
-                    actions.push_back(AIAction::build_baker(random_pos));
-                    break;
-                case AIActionType::BUILD_SAWMILL:
-                    actions.push_back(AIAction::build_sawmill(random_pos));
-                    break;
-                case AIActionType::BUILD_STEEL_SMELTER:
-                    actions.push_back(AIAction::build_steel_smelter(random_pos));
-                    break;
-                case AIActionType::BUILD_TOOL_MAKER:
-                    actions.push_back(AIAction::build_tool_maker(random_pos));
-                    break;
-                case AIActionType::BUILD_WEAPON_SMITH:
-                    actions.push_back(AIAction::build_weapon_smith(random_pos));
-                    break;
-                case AIActionType::BUILD_TOWER:
-                    actions.push_back(AIAction::build_tower(random_pos));
-                    break;
-                case AIActionType::BUILD_FORTRESS:
-                    actions.push_back(AIAction::build_fortress(random_pos));
-                    break;
-                case AIActionType::BUILD_GOLD_SMELTER:
-                    actions.push_back(AIAction::build_gold_smelter(random_pos));
-                    break;
-                case AIActionType::BUILD_LUMBERJACK:
-                    actions.push_back(AIAction::build_lumberjack(random_pos));
-                    break;
-                case AIActionType::BUILD_FORESTER:
-                    actions.push_back(AIAction::build_forester(random_pos));
-                    break;
-                default:
-                    // Fallback for unmapped types
-                    break;
+            // Calculate flag position and add to pending connection queue
+            // NOTE: This assumes building placement will succeed - if it fails, the flag won't exist
+            MapPos flag_pos = calculate_building_flag_position(random_pos, random_type, state);
+            if (flag_pos != 0) {
+                add_pending_building(random_pos, flag_pos, random_type, state.game_tick);
+                AILogger::log_debug(agent_name + ": [CRITICAL TIMING] Building queued optimistically - " + 
+                                   "type " + std::to_string(static_cast<int>(random_type)) + 
+                                   " at " + std::to_string(random_pos) + 
+                                   " (estimated flag: " + std::to_string(flag_pos) + 
+                                   ") - SUCCESS UNKNOWN UNTIL NEXT TICK");
+            } else {
+                AILogger::log_debug(agent_name + ": [WARNING] Cannot calculate flag position for building " + 
+                                   std::to_string(static_cast<int>(random_type)) + " at " + 
+                                   std::to_string(random_pos) + " - connection will fail");
             }
-            
-            if (!actions.empty()) {
-                AILogger::log_debug(agent_name + ": Random building " + std::to_string(static_cast<int>(random_type)) + 
-                                   " at " + std::to_string(random_pos));
-                actions_this_tick++;
-                
-                // IMMEDIATE ROAD BUILDING: Connect building to existing network
-                if (actions_this_tick < MAX_ACTIONS_PER_TICK) {
-                    MapPos building_flag_pos = calculate_building_flag_position(random_pos, random_type, state);
-                    if (building_flag_pos != 0) {
-                        MapPos target_flag = find_connection_target_flag(state, building_flag_pos);
-                        if (target_flag != 0 && target_flag != building_flag_pos) {
-                            actions.push_back(AIAction::build_road(building_flag_pos, target_flag));
-                            AILogger::log_debug(agent_name + ": Immediate road connection " + 
-                                               std::to_string(building_flag_pos) + " -> " + std::to_string(target_flag));
-                            actions_this_tick++;
-                        } else {
-                            AILogger::log_debug(agent_name + ": No suitable connection target for building at " + std::to_string(random_pos));
-                        }
-                    } else {
-                        AILogger::log_debug(agent_name + ": Could not calculate flag position for building at " + std::to_string(random_pos));
-                    }
-                }
-            }
+            actions_this_tick++;
+        } else {
+            AILogger::log_debug(agent_name + ": [PRIORITY 3] No valid position found for building type " + 
+                               std::to_string(static_cast<int>(random_type)));
         }
     }
     
-    // Reduced random road building (to avoid conflicts with immediate connections)
-    if (actions.empty() && should_build_roads(state) && prob_dist(gen) < 0.05f) { // Much lower probability
-        auto available_flags = find_all_player_flags(state);
-        if (available_flags.size() >= 2) {
-            std::uniform_int_distribution<size_t> flag_selector(0, available_flags.size() - 1);
-            MapPos flag1 = available_flags[flag_selector(gen)];
-            MapPos flag2 = available_flags[flag_selector(gen)];
-            
-            if (flag1 != flag2) {
-                actions.push_back(AIAction::build_road(flag1, flag2));
-                AILogger::log_debug(agent_name + ": Supplemental road " + std::to_string(flag1) + " -> " + std::to_string(flag2));
-                actions_this_tick++;
-            }
-        }
-    }
-    
-    // Random flag placement (if no other actions)
+    // Fallback: Random flag placement (if no other actions)
     if (actions.empty() && prob_dist(gen) < 0.1f) {  // 10% chance for random flag
         MapPos random_pos = get_random_position(state);
         if (random_pos != 0) {
             actions.push_back(AIAction::build_flag(random_pos));
-            AILogger::log_debug(agent_name + ": Random flag at " + std::to_string(random_pos));
+            AILogger::log_debug(agent_name + ": [FALLBACK] Random flag at " + std::to_string(random_pos));
         }
     }
+    
+    // Log final decision summary
+    AILogger::log_debug(agent_name + ": [TICK END] Tick " + std::to_string(state.game_tick) + 
+                       " - Returning " + std::to_string(actions.size()) + " action(s), " +
+                       std::to_string(buildings_awaiting_connection.size()) + " buildings still awaiting connection");
     
     return actions;
 }
@@ -363,17 +369,39 @@ std::vector<MapPos> RandomAgent::find_all_player_flags(const GameState& state) {
     std::vector<MapPos> flags;
     const auto& map = state.map;
     
+    AILogger::log_debug(agent_name + ": [FLAG SCAN] Starting flag scan - map size: " + 
+                       std::to_string(map.width) + "x" + std::to_string(map.height) + 
+                       ", has_flag.size: " + std::to_string(map.has_flag.size()) + 
+                       ", ownership.size: " + std::to_string(map.ownership.size()) + 
+                       ", player_index: " + std::to_string(state.self.player_index));
+    
+    int total_flags_found = 0;
+    int player_owned_flags = 0;
+    
     // Scan the has_flag boolean vector to find all flag positions
     for (size_t i = 0; i < map.has_flag.size(); ++i) {
         if (map.has_flag[i]) {
+            total_flags_found++;
             // Check if this flag belongs to our player by checking nearby ownership
             if (i < map.ownership.size() && map.ownership[i] == state.self.player_index) {
+                player_owned_flags++;
                 flags.push_back(static_cast<MapPos>(i));
+                int x = i % map.width;
+                int y = i / map.width;
+                AILogger::log_debug(agent_name + ": [FLAG SCAN] Player flag found at pos " + 
+                                   std::to_string(i) + " (" + std::to_string(x) + "," + std::to_string(y) + ")");
+            } else {
+                // Log other player flags for debugging
+                int owner = (i < map.ownership.size()) ? map.ownership[i] : -1;
+                AILogger::log_debug(agent_name + ": [FLAG SCAN] Other flag at pos " + std::to_string(i) + 
+                                   " owned by player " + std::to_string(owner));
             }
         }
     }
     
-    AILogger::log_debug(agent_name + ": Found " + std::to_string(flags.size()) + " player flags");
+    AILogger::log_debug(agent_name + ": [FLAG SCAN] Summary - Total flags: " + std::to_string(total_flags_found) + 
+                       ", Player flags: " + std::to_string(player_owned_flags) + 
+                       ", Returned: " + std::to_string(flags.size()));
     return flags;
 }
 
@@ -634,4 +662,131 @@ int RandomAgent::count_castle_connections(const GameState& state) {
     
     AILogger::log_debug(agent_name + ": Castle connections estimated: " + std::to_string(connections));
     return connections;
+}
+
+// Sequential building->road->demolish state management methods
+
+void RandomAgent::update_building_states(const GameState& state) {
+    // Clean up buildings that no longer exist or are already connected
+    clear_completed_buildings(state);
+    
+    // Log current state for debugging
+    if (!buildings_awaiting_connection.empty() || !buildings_failed_connection.empty()) {
+        AILogger::log_debug(agent_name + ": State update - awaiting: " + 
+                           std::to_string(buildings_awaiting_connection.size()) + 
+                           ", failed: " + std::to_string(buildings_failed_connection.size()));
+    }
+}
+
+void RandomAgent::add_pending_building(MapPos building_pos, MapPos flag_pos, 
+                                      Building::Type type, uint32_t tick) {
+    buildings_awaiting_connection.emplace_back(building_pos, flag_pos, type, tick);
+    AILogger::log_debug(agent_name + ": Added building to connection queue - pos: " + 
+                       std::to_string(building_pos) + ", flag: " + std::to_string(flag_pos) + 
+                       ", type: " + std::to_string(static_cast<int>(type)));
+}
+
+void RandomAgent::move_to_failed_connection(const PendingBuilding& building) {
+    buildings_failed_connection.push_back(building);
+    AILogger::log_debug(agent_name + ": Building connection failed, moved to demolition queue - pos: " + 
+                       std::to_string(building.position) + ", type: " + 
+                       std::to_string(static_cast<int>(building.type)));
+}
+
+bool RandomAgent::is_castle_building(Building::Type type) {
+    return type == Building::TypeCastle;
+}
+
+void RandomAgent::clear_completed_buildings(const GameState& state) {
+    // Remove buildings from pending list if they no longer exist in the game
+    // This handles cases where buildings were demolished by other means or external events
+    
+    auto remove_from_awaiting = std::remove_if(buildings_awaiting_connection.begin(), 
+                                              buildings_awaiting_connection.end(),
+        [&](const PendingBuilding& building) {
+            // Simple check: if building is very old (>10 ticks), assume it's been processed
+            uint32_t age = state.game_tick - building.built_tick;
+            if (age > 10) {
+                AILogger::log_debug(agent_name + ": Removing stale building from awaiting queue: " + 
+                                   std::to_string(building.position) + " (age: " + std::to_string(age) + ")");
+                return true;
+            }
+            return false;
+        });
+    
+    buildings_awaiting_connection.erase(remove_from_awaiting, buildings_awaiting_connection.end());
+    
+    // Clear failed connection list after a reasonable timeout to prevent infinite accumulation
+    auto remove_from_failed = std::remove_if(buildings_failed_connection.begin(), 
+                                            buildings_failed_connection.end(),
+        [&](const PendingBuilding& building) {
+            uint32_t age = state.game_tick - building.built_tick;
+            if (age > 20) {  // Keep failed buildings longer for demolition attempts
+                AILogger::log_debug(agent_name + ": Removing stale building from failed queue: " + 
+                                   std::to_string(building.position) + " (age: " + std::to_string(age) + ")");
+                return true;
+            }
+            return false;
+        });
+    
+    buildings_failed_connection.erase(remove_from_failed, buildings_failed_connection.end());
+}
+
+// Helper method to create building action from type and position
+AIAction RandomAgent::create_building_action(Building::Type building_type, MapPos pos) {
+    AIActionType action_type = building_type_to_action_type(building_type);
+    
+    switch (action_type) {
+        case AIActionType::BUILD_FISHER:
+            return AIAction::build_fisher(pos);
+        case AIActionType::BUILD_BOATBUILDER:
+            return AIAction::build_boatbuilder(pos);
+        case AIActionType::BUILD_STONECUTTER:
+            return AIAction::build_stonecutter(pos);
+        case AIActionType::BUILD_STONE_MINE:
+            return AIAction::build_stone_mine(pos);
+        case AIActionType::BUILD_COAL_MINE:
+            return AIAction::build_coal_mine(pos);
+        case AIActionType::BUILD_IRON_MINE:
+            return AIAction::build_iron_mine(pos);
+        case AIActionType::BUILD_GOLD_MINE:
+            return AIAction::build_gold_mine(pos);
+        case AIActionType::BUILD_STOCK:
+            return AIAction::build_stock(pos);
+        case AIActionType::BUILD_HUT:
+            return AIAction::build_hut(pos);
+        case AIActionType::BUILD_FARM:
+            return AIAction::build_farm(pos);
+        case AIActionType::BUILD_BUTCHER:
+            return AIAction::build_butcher(pos);
+        case AIActionType::BUILD_PIG_FARM:
+            return AIAction::build_pig_farm(pos);
+        case AIActionType::BUILD_MILL:
+            return AIAction::build_mill(pos);
+        case AIActionType::BUILD_BAKER:
+            return AIAction::build_baker(pos);
+        case AIActionType::BUILD_SAWMILL:
+            return AIAction::build_sawmill(pos);
+        case AIActionType::BUILD_STEEL_SMELTER:
+            return AIAction::build_steel_smelter(pos);
+        case AIActionType::BUILD_TOOL_MAKER:
+            return AIAction::build_tool_maker(pos);
+        case AIActionType::BUILD_WEAPON_SMITH:
+            return AIAction::build_weapon_smith(pos);
+        case AIActionType::BUILD_TOWER:
+            return AIAction::build_tower(pos);
+        case AIActionType::BUILD_FORTRESS:
+            return AIAction::build_fortress(pos);
+        case AIActionType::BUILD_GOLD_SMELTER:
+            return AIAction::build_gold_smelter(pos);
+        case AIActionType::BUILD_LUMBERJACK:
+            return AIAction::build_lumberjack(pos);
+        case AIActionType::BUILD_FORESTER:
+            return AIAction::build_forester(pos);
+        case AIActionType::BUILD_CASTLE:
+            return AIAction::build_castle(pos);
+        default:
+            // Fallback for unmapped types
+            return AIAction::build_lumberjack(pos);
+    }
 }
