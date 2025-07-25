@@ -23,6 +23,7 @@ enum class ActionError {
     NO_ADJACENT_FLAG = 7,
     INVALID_ROAD_PATH = 8,
     GAME_ENGINE_ERROR = 9,
+    INVALID_PARAMETER = 11,
     UNKNOWN_ERROR = 10
 };
 
@@ -68,6 +69,11 @@ public:
         static ActionValidationResult validate_demolish_flag(MapPos pos, const Game* game, const Player* player);
         static ActionValidationResult validate_demolish_road(MapPos pos, const Game* game, const Player* player);
         
+        // Set action validation methods
+        static ActionValidationResult validate_set_resource_priority(Resource::Type type, int priority, const Player* player);
+        static ActionValidationResult validate_set_tool_priority(int tool_index, int priority, const Player* player);
+        static ActionValidationResult validate_set_food_distribution(Building::Type mine_type, int amount, const Player* player);
+        
     private:
         // Helper method for smart castle position finding
         static MapPos find_valid_castle_position_nearby(MapPos suggested_pos, Game* game, Player* player);
@@ -101,6 +107,11 @@ public:
         static ActionResult execute_demolish_building(const AIAction& action, Game* game, Player* player);
         static ActionResult execute_demolish_flag(const AIAction& action, Game* game, Player* player);
         static ActionResult execute_demolish_road(const AIAction& action, Game* game, Player* player);
+        
+        // Set action execution methods
+        static ActionResult execute_set_resource_priority(const AIAction& action, Resource::Type type, Game* game, Player* player);
+        static ActionResult execute_set_tool_priority(const AIAction& action, int tool_index, Game* game, Player* player);
+        static ActionResult execute_set_food_distribution(const AIAction& action, Building::Type mine_type, Game* game, Player* player);
         
         static ActionResult create_success_result(const std::string& message, float reward, std::chrono::microseconds exec_time);
         static ActionResult create_failure_result(const std::string& message, ActionError error, std::chrono::microseconds exec_time);

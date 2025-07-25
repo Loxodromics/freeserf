@@ -258,9 +258,65 @@ AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::vali
         case AIActionType::DEMOLISH_ROAD:
             return validate_demolish_road(action.primary_position, game, player);
             
+        // Resource Priority Validations (60-85)
+        case AIActionType::SET_RESOURCE_PRIORITY_FISH:
+        case AIActionType::SET_RESOURCE_PRIORITY_PIG:
+        case AIActionType::SET_RESOURCE_PRIORITY_MEAT:
+        case AIActionType::SET_RESOURCE_PRIORITY_WHEAT:
+        case AIActionType::SET_RESOURCE_PRIORITY_FLOUR:
+        case AIActionType::SET_RESOURCE_PRIORITY_BREAD:
+        case AIActionType::SET_RESOURCE_PRIORITY_LUMBER:
+        case AIActionType::SET_RESOURCE_PRIORITY_PLANK:
+        case AIActionType::SET_RESOURCE_PRIORITY_BOAT:
+        case AIActionType::SET_RESOURCE_PRIORITY_STONE:
+        case AIActionType::SET_RESOURCE_PRIORITY_IRON_ORE:
+        case AIActionType::SET_RESOURCE_PRIORITY_STEEL:
+        case AIActionType::SET_RESOURCE_PRIORITY_COAL:
+        case AIActionType::SET_RESOURCE_PRIORITY_GOLD_ORE:
+        case AIActionType::SET_RESOURCE_PRIORITY_GOLD_BAR:
+        case AIActionType::SET_RESOURCE_PRIORITY_SHOVEL:
+        case AIActionType::SET_RESOURCE_PRIORITY_HAMMER:
+        case AIActionType::SET_RESOURCE_PRIORITY_ROD:
+        case AIActionType::SET_RESOURCE_PRIORITY_CLEAVER:
+        case AIActionType::SET_RESOURCE_PRIORITY_SCYTHE:
+        case AIActionType::SET_RESOURCE_PRIORITY_AXE:
+        case AIActionType::SET_RESOURCE_PRIORITY_SAW:
+        case AIActionType::SET_RESOURCE_PRIORITY_PICK:
+        case AIActionType::SET_RESOURCE_PRIORITY_PINCER:
+        case AIActionType::SET_RESOURCE_PRIORITY_SWORD:
+        case AIActionType::SET_RESOURCE_PRIORITY_SHIELD: {
+            Resource::Type resource_type = static_cast<Resource::Type>(
+                static_cast<int>(action.type) - static_cast<int>(AIActionType::SET_RESOURCE_PRIORITY_FISH));
+            return validate_set_resource_priority(resource_type, action.parameter1, player);
+        }
+        
+        // Tool Priority Validations (90-98)
+        case AIActionType::SET_TOOL_PRIORITY_SHOVEL:
+        case AIActionType::SET_TOOL_PRIORITY_HAMMER:
+        case AIActionType::SET_TOOL_PRIORITY_ROD:
+        case AIActionType::SET_TOOL_PRIORITY_CLEAVER:
+        case AIActionType::SET_TOOL_PRIORITY_SCYTHE:
+        case AIActionType::SET_TOOL_PRIORITY_AXE:
+        case AIActionType::SET_TOOL_PRIORITY_SAW:
+        case AIActionType::SET_TOOL_PRIORITY_PICK:
+        case AIActionType::SET_TOOL_PRIORITY_PINCER: {
+            int tool_index = static_cast<int>(action.type) - static_cast<int>(AIActionType::SET_TOOL_PRIORITY_SHOVEL);
+            return validate_set_tool_priority(tool_index, action.parameter1, player);
+        }
+
         case AIActionType::NO_ACTION:
         case AIActionType::WAIT:
             return {true, "No action or wait - always valid", ActionError::SUCCESS, 1.0f};
+            
+        // Food Distribution Validations (101-104)
+        case AIActionType::SET_FOOD_STONE_MINE:
+            return validate_set_food_distribution(Building::TypeStoneMine, action.parameter1, player);
+        case AIActionType::SET_FOOD_COAL_MINE:
+            return validate_set_food_distribution(Building::TypeCoalMine, action.parameter1, player);
+        case AIActionType::SET_FOOD_IRON_MINE:
+            return validate_set_food_distribution(Building::TypeIronMine, action.parameter1, player);
+        case AIActionType::SET_FOOD_GOLD_MINE:
+            return validate_set_food_distribution(Building::TypeGoldMine, action.parameter1, player);
             
         default:
             return {false, "Unknown action type", ActionError::UNKNOWN_ERROR, 0.0f};
@@ -558,6 +614,54 @@ std::vector<AgentIntegration::ActionResult> AgentIntegration::ActionExecutor::ex
                 result = execute_demolish_road(action, game, player);
                 break;
                 
+            // Resource Priority Executions (60-85)
+            case AIActionType::SET_RESOURCE_PRIORITY_FISH:
+            case AIActionType::SET_RESOURCE_PRIORITY_PIG:
+            case AIActionType::SET_RESOURCE_PRIORITY_MEAT:
+            case AIActionType::SET_RESOURCE_PRIORITY_WHEAT:
+            case AIActionType::SET_RESOURCE_PRIORITY_FLOUR:
+            case AIActionType::SET_RESOURCE_PRIORITY_BREAD:
+            case AIActionType::SET_RESOURCE_PRIORITY_LUMBER:
+            case AIActionType::SET_RESOURCE_PRIORITY_PLANK:
+            case AIActionType::SET_RESOURCE_PRIORITY_BOAT:
+            case AIActionType::SET_RESOURCE_PRIORITY_STONE:
+            case AIActionType::SET_RESOURCE_PRIORITY_IRON_ORE:
+            case AIActionType::SET_RESOURCE_PRIORITY_STEEL:
+            case AIActionType::SET_RESOURCE_PRIORITY_COAL:
+            case AIActionType::SET_RESOURCE_PRIORITY_GOLD_ORE:
+            case AIActionType::SET_RESOURCE_PRIORITY_GOLD_BAR:
+            case AIActionType::SET_RESOURCE_PRIORITY_SHOVEL:
+            case AIActionType::SET_RESOURCE_PRIORITY_HAMMER:
+            case AIActionType::SET_RESOURCE_PRIORITY_ROD:
+            case AIActionType::SET_RESOURCE_PRIORITY_CLEAVER:
+            case AIActionType::SET_RESOURCE_PRIORITY_SCYTHE:
+            case AIActionType::SET_RESOURCE_PRIORITY_AXE:
+            case AIActionType::SET_RESOURCE_PRIORITY_SAW:
+            case AIActionType::SET_RESOURCE_PRIORITY_PICK:
+            case AIActionType::SET_RESOURCE_PRIORITY_PINCER:
+            case AIActionType::SET_RESOURCE_PRIORITY_SWORD:
+            case AIActionType::SET_RESOURCE_PRIORITY_SHIELD: {
+                Resource::Type resource_type = static_cast<Resource::Type>(
+                    static_cast<int>(action.type) - static_cast<int>(AIActionType::SET_RESOURCE_PRIORITY_FISH));
+                result = execute_set_resource_priority(action, resource_type, game, player);
+                break;
+            }
+            
+            // Tool Priority Executions (90-98)
+            case AIActionType::SET_TOOL_PRIORITY_SHOVEL:
+            case AIActionType::SET_TOOL_PRIORITY_HAMMER:
+            case AIActionType::SET_TOOL_PRIORITY_ROD:
+            case AIActionType::SET_TOOL_PRIORITY_CLEAVER:
+            case AIActionType::SET_TOOL_PRIORITY_SCYTHE:
+            case AIActionType::SET_TOOL_PRIORITY_AXE:
+            case AIActionType::SET_TOOL_PRIORITY_SAW:
+            case AIActionType::SET_TOOL_PRIORITY_PICK:
+            case AIActionType::SET_TOOL_PRIORITY_PINCER: {
+                int tool_index = static_cast<int>(action.type) - static_cast<int>(AIActionType::SET_TOOL_PRIORITY_SHOVEL);
+                result = execute_set_tool_priority(action, tool_index, game, player);
+                break;
+            }
+
             case AIActionType::NO_ACTION:
             case AIActionType::WAIT:
                 {
@@ -565,6 +669,20 @@ std::vector<AgentIntegration::ActionResult> AgentIntegration::ActionExecutor::ex
                     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
                     result = create_success_result("No action or wait completed", 0.0f, duration);
                 }
+                break;
+                
+            // Food Distribution Executions (101-104)
+            case AIActionType::SET_FOOD_STONE_MINE:
+                result = execute_set_food_distribution(action, Building::TypeStoneMine, game, player);
+                break;
+            case AIActionType::SET_FOOD_COAL_MINE:
+                result = execute_set_food_distribution(action, Building::TypeCoalMine, game, player);
+                break;
+            case AIActionType::SET_FOOD_IRON_MINE:
+                result = execute_set_food_distribution(action, Building::TypeIronMine, game, player);
+                break;
+            case AIActionType::SET_FOOD_GOLD_MINE:
+                result = execute_set_food_distribution(action, Building::TypeGoldMine, game, player);
                 break;
                 
             default:
@@ -914,6 +1032,114 @@ AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::vali
     } else {
         return {false, "Cannot demolish road at position", ActionError::INVALID_POSITION, 0.0f};
     }
+}
+
+// Set Action Validation Methods
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_set_resource_priority(
+    Resource::Type type, int priority, const Player* player) {
+    
+    // Basic validation: priority should be reasonable range (0-65535)
+    if (priority < 0 || priority > 65535) {
+        return {false, "Priority value out of range", ActionError::INVALID_PARAMETER, 0.0f};
+    }
+    
+    // Resource priority setting is almost always valid
+    return {true, "Resource priority can be set", ActionError::SUCCESS, 1.0f};
+}
+
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_set_tool_priority(
+    int tool_index, int priority, const Player* player) {
+    
+    // Validate tool index range (0-8)
+    if (tool_index < 0 || tool_index > 8) {
+        return {false, "Tool index out of range", ActionError::INVALID_PARAMETER, 0.0f};
+    }
+    
+    // Basic validation: priority should be reasonable range (0-65535)
+    if (priority < 0 || priority > 65535) {
+        return {false, "Priority value out of range", ActionError::INVALID_PARAMETER, 0.0f};
+    }
+    
+    return {true, "Tool priority can be set", ActionError::SUCCESS, 1.0f};
+}
+
+AgentIntegration::ActionValidationResult AgentIntegration::ActionValidator::validate_set_food_distribution(
+    Building::Type mine_type, int amount, const Player* player) {
+    
+    // Validate mine type
+    if (mine_type != Building::TypeStoneMine && mine_type != Building::TypeCoalMine && 
+        mine_type != Building::TypeIronMine && mine_type != Building::TypeGoldMine) {
+        return {false, "Invalid mine type for food distribution", ActionError::INVALID_PARAMETER, 0.0f};
+    }
+    
+    // Food distribution amounts should be reasonable (0-100)
+    if (amount < 0 || amount > 100) {
+        return {false, "Food amount out of range", ActionError::INVALID_PARAMETER, 0.0f};
+    }
+    
+    return {true, "Food distribution can be set", ActionError::SUCCESS, 1.0f};
+}
+
+// Set Action Execution Methods
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_set_resource_priority(
+    const AIAction& action, Resource::Type type, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Execute using player flag_prio array (research showed this is the resource priority system)
+    player->get_flag_prio()[static_cast<int>(type)] = action.parameter1;
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
+    // Set actions typically have small positive rewards (frequent, low-impact decisions)
+    return {true, 0.1f, "Resource priority updated", ActionError::SUCCESS, execution_time};
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_set_tool_priority(
+    const AIAction& action, int tool_index, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Execute using existing player method
+    player->set_tool_prio(tool_index, action.parameter1);
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
+    return {true, 0.1f, "Tool priority updated", ActionError::SUCCESS, execution_time};
+}
+
+AgentIntegration::ActionResult AgentIntegration::ActionExecutor::execute_set_food_distribution(
+    const AIAction& action, Building::Type mine_type, Game* game, Player* player) {
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    // Execute using existing player methods (research showed these methods exist)
+    switch (mine_type) {
+        case Building::TypeStoneMine:
+            player->set_food_stonemine(action.parameter1);
+            break;
+        case Building::TypeCoalMine:
+            player->set_food_coalmine(action.parameter1);
+            break;
+        case Building::TypeIronMine:
+            player->set_food_ironmine(action.parameter1);
+            break;
+        case Building::TypeGoldMine:
+            player->set_food_goldmine(action.parameter1);
+            break;
+        default:
+            // This should never happen due to validation
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+            return {false, 0.0f, "Invalid mine type", ActionError::INVALID_PARAMETER, execution_time};
+    }
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto execution_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    
+    return {true, 0.2f, "Food distribution updated", ActionError::SUCCESS, execution_time};
 }
 
 // Demolition execution methods

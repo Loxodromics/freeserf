@@ -23,6 +23,11 @@ private:
     static constexpr float BASE_BUILDING_PROBABILITY = 0.3f;  // 30% chance per tick
     static constexpr float BASE_ROAD_PROBABILITY = 0.2f;      // 20% chance per tick
     static constexpr int MAX_ACTIONS_PER_TICK = 2;            // Limit actions to avoid spam
+    
+    // Resource management parameters
+    static constexpr float RESOURCE_ACTION_PROBABILITY = 0.2f;  // 20% chance per tick
+    static constexpr float TOOL_ACTION_PROBABILITY = 0.15f;     // 15% chance per tick  
+    static constexpr float FOOD_ACTION_PROBABILITY = 0.1f;      // 10% chance per tick
 
 public:
     RandomAgent(const std::string& name = "RandomAgent");
@@ -90,4 +95,9 @@ private:
     
     // Helper method for building creation
     AIAction create_building_action(Building::Type building_type, MapPos pos);
+    
+    // Resource management helper methods
+    AIAction get_random_resource_action();
+    AIAction get_random_tool_action();
+    AIAction get_random_food_action();
 };

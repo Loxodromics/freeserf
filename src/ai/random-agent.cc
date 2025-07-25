@@ -189,6 +189,31 @@ std::vector<AIAction> RandomAgent::get_actions(const GameState& state) {
         }
     }
     
+    // PRIORITY 4: Resource management actions (new in Phase 0.8.3)
+    // Only perform resource management if we have capacity for more actions
+    if (actions_this_tick < MAX_ACTIONS_PER_TICK) {
+        // Random resource priority adjustments (20% chance per tick)
+        if (prob_dist(gen) < RESOURCE_ACTION_PROBABILITY) {
+            actions.push_back(get_random_resource_action());
+            actions_this_tick++;
+            AILogger::log_debug(agent_name + ": [RESOURCE] Added random resource priority action");
+        }
+        
+        // Random tool priority adjustments (15% chance per tick)  
+        if (actions_this_tick < MAX_ACTIONS_PER_TICK && prob_dist(gen) < TOOL_ACTION_PROBABILITY) {
+            actions.push_back(get_random_tool_action());
+            actions_this_tick++;
+            AILogger::log_debug(agent_name + ": [TOOL] Added random tool priority action");
+        }
+        
+        // Random food distribution changes (10% chance per tick)
+        if (actions_this_tick < MAX_ACTIONS_PER_TICK && prob_dist(gen) < FOOD_ACTION_PROBABILITY) {
+            actions.push_back(get_random_food_action());
+            actions_this_tick++;
+            AILogger::log_debug(agent_name + ": [FOOD] Added random food distribution action");
+        }
+    }
+    
     // Log final decision summary
     AILogger::log_debug(agent_name + ": [TICK END] Tick " + std::to_string(state.game_tick) + 
                        " - Returning " + std::to_string(actions.size()) + " action(s), " +
@@ -291,7 +316,7 @@ AIActionType RandomAgent::building_type_to_action_type(Building::Type type) {
 }
 
 int RandomAgent::get_action_space_size() const {
-    return 26;  // Total number of action types (BUILD_CASTLE through BUILD_GOLD_SMELTER + specials)
+    return 105;  // Updated to include all set actions (60-104): buildings + demolish + resource/tool/food management
 }
 
 std::vector<bool> RandomAgent::get_valid_actions(const GameState& state) {
@@ -788,5 +813,43 @@ AIAction RandomAgent::create_building_action(Building::Type building_type, MapPo
         default:
             // Fallback for unmapped types
             return AIAction::build_lumberjack(pos);
+    }
+}
+
+// Resource management helper methods (Phase 0.8.3)
+AIAction RandomAgent::get_random_resource_action() {
+    // Select random resource type (0-25, 26 total resource types)
+    Resource::Type random_type = static_cast<Resource::Type>(
+        std::uniform_int_distribution<int>{0, 25}(gen));
+    
+    // Select random priority value (0-65535 based on tool priority defaults)
+    int random_priority = std::uniform_int_distribution<int>{0, 65535}(gen);
+    
+    return AIAction::set_resource_priority(random_type, random_priority);
+}
+
+AIAction RandomAgent::get_random_tool_action() {
+    // Select random tool index (0-8, 9 total tool types)
+    int random_tool_index = std::uniform_int_distribution<int>{0, 8}(gen);
+    
+    // Select random priority value (0-65535)
+    int random_priority = std::uniform_int_distribution<int>{0, 65535}(gen);
+    
+    return AIAction::set_tool_priority(random_tool_index, random_priority);
+}
+
+AIAction RandomAgent::get_random_food_action() {
+    // Select random mine type for food distribution (0-3)
+    int mine_choice = std::uniform_int_distribution<int>{0, 3}(gen);
+    
+    // Select random food amount (0-100)
+    int random_amount = std::uniform_int_distribution<int>{0, 100}(gen);
+    
+    switch (mine_choice) {
+        case 0: return AIAction::set_food_stone_mine(random_amount);
+        case 1: return AIAction::set_food_coal_mine(random_amount);
+        case 2: return AIAction::set_food_iron_mine(random_amount);
+        case 3: return AIAction::set_food_gold_mine(random_amount);
+        default: return AIAction::set_food_stone_mine(random_amount);
     }
 }

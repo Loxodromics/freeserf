@@ -44,9 +44,54 @@ enum class AIActionType {
     DEMOLISH_FLAG = 51,
     DEMOLISH_ROAD = 52,
     
+    // Resource Priority Actions (60-85) - 26 resource types
+    SET_RESOURCE_PRIORITY_FISH = 60,
+    SET_RESOURCE_PRIORITY_PIG = 61,
+    SET_RESOURCE_PRIORITY_MEAT = 62,
+    SET_RESOURCE_PRIORITY_WHEAT = 63,
+    SET_RESOURCE_PRIORITY_FLOUR = 64,
+    SET_RESOURCE_PRIORITY_BREAD = 65,
+    SET_RESOURCE_PRIORITY_LUMBER = 66,
+    SET_RESOURCE_PRIORITY_PLANK = 67,
+    SET_RESOURCE_PRIORITY_BOAT = 68,
+    SET_RESOURCE_PRIORITY_STONE = 69,
+    SET_RESOURCE_PRIORITY_IRON_ORE = 70,
+    SET_RESOURCE_PRIORITY_STEEL = 71,
+    SET_RESOURCE_PRIORITY_COAL = 72,
+    SET_RESOURCE_PRIORITY_GOLD_ORE = 73,
+    SET_RESOURCE_PRIORITY_GOLD_BAR = 74,
+    SET_RESOURCE_PRIORITY_SHOVEL = 75,
+    SET_RESOURCE_PRIORITY_HAMMER = 76,
+    SET_RESOURCE_PRIORITY_ROD = 77,
+    SET_RESOURCE_PRIORITY_CLEAVER = 78,
+    SET_RESOURCE_PRIORITY_SCYTHE = 79,
+    SET_RESOURCE_PRIORITY_AXE = 80,
+    SET_RESOURCE_PRIORITY_SAW = 81,
+    SET_RESOURCE_PRIORITY_PICK = 82,
+    SET_RESOURCE_PRIORITY_PINCER = 83,
+    SET_RESOURCE_PRIORITY_SWORD = 84,
+    SET_RESOURCE_PRIORITY_SHIELD = 85,
+    
+    // Tool Priority Actions (90-98) - 9 tool types
+    SET_TOOL_PRIORITY_SHOVEL = 90,
+    SET_TOOL_PRIORITY_HAMMER = 91,
+    SET_TOOL_PRIORITY_ROD = 92,
+    SET_TOOL_PRIORITY_CLEAVER = 93,
+    SET_TOOL_PRIORITY_SCYTHE = 94,
+    SET_TOOL_PRIORITY_AXE = 95,
+    SET_TOOL_PRIORITY_SAW = 96,
+    SET_TOOL_PRIORITY_PICK = 97,
+    SET_TOOL_PRIORITY_PINCER = 98,
+    
     // Special Actions
     NO_ACTION = 99,
     WAIT = 100,
+    
+    // Food Distribution Actions (101-104) - 4 mine types
+    SET_FOOD_STONE_MINE = 101,
+    SET_FOOD_COAL_MINE = 102,
+    SET_FOOD_IRON_MINE = 103,
+    SET_FOOD_GOLD_MINE = 104,
     
     // Future expansion placeholder
     FUTURE_ACTION_START = 200
@@ -192,5 +237,34 @@ struct AIAction {
     
     static AIAction no_action() {
         return {AIActionType::NO_ACTION, 0, 0, 0, 0, 0.0f, 1.0f};
+    }
+    
+    // Resource Priority Factory Methods
+    static AIAction set_resource_priority(Resource::Type type, int priority, float action_priority = 0.4f) {
+        return {static_cast<AIActionType>(static_cast<int>(AIActionType::SET_RESOURCE_PRIORITY_FISH) + static_cast<int>(type)), 
+                0, 0, priority, 0, action_priority, 1.0f};
+    }
+    
+    // Tool Priority Factory Methods  
+    static AIAction set_tool_priority(int tool_index, int priority, float action_priority = 0.4f) {
+        return {static_cast<AIActionType>(static_cast<int>(AIActionType::SET_TOOL_PRIORITY_SHOVEL) + tool_index), 
+                0, 0, priority, 0, action_priority, 1.0f};
+    }
+    
+    // Food Distribution Factory Methods
+    static AIAction set_food_stone_mine(int amount, float action_priority = 0.5f) {
+        return {AIActionType::SET_FOOD_STONE_MINE, 0, 0, amount, 0, action_priority, 1.0f};
+    }
+    
+    static AIAction set_food_coal_mine(int amount, float action_priority = 0.5f) {
+        return {AIActionType::SET_FOOD_COAL_MINE, 0, 0, amount, 0, action_priority, 1.0f};
+    }
+    
+    static AIAction set_food_iron_mine(int amount, float action_priority = 0.5f) {
+        return {AIActionType::SET_FOOD_IRON_MINE, 0, 0, amount, 0, action_priority, 1.0f};
+    }
+    
+    static AIAction set_food_gold_mine(int amount, float action_priority = 0.5f) {
+        return {AIActionType::SET_FOOD_GOLD_MINE, 0, 0, amount, 0, action_priority, 1.0f};
     }
 };

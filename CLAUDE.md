@@ -9,57 +9,21 @@ FreeSerf is a C++ implementation of the classic strategy game Settlers, using CM
 ## Workflow
 * Write your planes into a file in the work-logs directory. Update your plan file after each step to reflect the current state. 
 * Your plan should include regularly compiling and running the program.
-* Use the AI log to see if your implementation actually works, that's what we have added it for. You plan needs to include theses test executed by you. Remember to filter the log or  pipe it to a file, since it gets ver long quickly.
+* Use the AI log to see if your implementation actually works, that's what we have added it for. So, make your actions visible in the log. You plan needs to include these test executed by you. Remember to filter the log or  pipe it to a file, since it gets ver long quickly.
 * Use `timeout` for testing and killing the program. 
+* Write you work plan to a file in the work-log directory and update the status regulary 
 
 **Current Status**: Functional AI agents can play FreeSerf with complete observe-decide-act cycles.
 
 ## Build Commands
 
-### Traditional Build (current working approach)
-```bash
-# Build project
-mkdir build && cd build
-cmake -G Ninja ..
-ninja
-
-# Run tests
-ninja test
-
-# Check code style
-ninja check_style
-```
-
-### Conan 2 Build (modern dependency management)
-```bash
-# Create build directory and install Conan 2 dependencies
-mkdir build
-conan install . --output-folder=build --build=missing
-
-# Build project with Conan 2
-cd build
-cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
-ninja
-
-# Run tests
-ninja test
-
-# Check code style
-ninja check_style
-```
-
 ### SDL3 Build (default)
 ```bash
-# Traditional Build with SDL3 (default)
-mkdir build && cd build
-cmake -G Ninja -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON ..
-ninja
-
 # Conan 2 Build with SDL3 (recommended)
 mkdir build
 conan install . --output-folder=build --build=missing
 cd build
-cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=ON -DENABLE_SDL_MIXER=ON
+cmake .. -G Ninja -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DUSE_SDL3=ON -DENABLE_SDL_MIXER=OFF
 ninja
 
 # Run tests
@@ -68,6 +32,8 @@ ninja test
 # Check code style
 ninja check_style
 ```
+
+SDL_mixer is broken at the moment so we turn it off.
 
 ## Code Architecture
 
